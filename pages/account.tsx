@@ -21,10 +21,7 @@ type Profile = {
   hobbies: string[] | null;
 }
 
-type UpdateProfileParams = {
-  username: Profile['username'];
-  [key: string]: any;
-};
+type UpdateProfileParams = Partial<Profile>;
 
 type AccountPageProps = {
   session: Session;
