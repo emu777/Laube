@@ -21,12 +21,17 @@ type Profile = {
   hobbies: string[] | null;
 }
 
+type UpdateProfileParams = {
+  username: Profile['username'];
+  [key: string]: any;
+};
+
 type AccountPageProps = {
   session: Session;
   profile: Profile;
 };
 
-export default function Account({ session, profile }: AccountPageProps) {
+export default function Account({ profile }: Omit<AccountPageProps, 'session'>) {
   const supabase = useSupabaseClient()
   const user = useUser()
   const [loading, setLoading] = useState(true)
@@ -56,10 +61,7 @@ export default function Account({ session, profile }: AccountPageProps) {
     smoking,
     bio,
     hobbies
-  }: {
-    username: Profile['username'];
-    [key: string]: any;
-  },
+  }: UpdateProfileParams,
   alertMessage: string = 'プロフを更新しました。') {
     try {
       setLoading(true)
