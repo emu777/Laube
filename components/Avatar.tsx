@@ -1,0 +1,104 @@
+import React, { useEffect, useState } from 'react'
+import { useSupabaseClient } from '@supabase/auth-helpers-react'
+
+type Profile = {
+  avatar_url: string | null
+}
+
+export default function Avatar({
+  uid,
+  url,
+  size,
+  onUpload,
+}: {
+  uid: string
+  url: Profile['avatar_url']
+  size: number
+  onUpload: (filePath: string) => void
+}) {
+  const supabase = useSupabaseClient()
+  const [avatarUrl, setAvatarUrl] = useState<Profile['avatar_url']>(null)
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (url) downloadImage(url)
+  }, [url])
+
+  async function downloadImage(path: string) {
+    try {
+      const { data, error } = await supabase.storage.from('avatars').download(path)
+      if (error) {
+        throw error
+      }
+      const url = URL.createObjectURL(data)
+      setAvatarUrl(url)
+    } catch (error) {
+      console.log('Error downloading image: ', error)
+    }
+  }
+
+  const uploadAvatar: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    try {
+      setUploading(true)
+
+      if (!event.target.files || event.target.files.length === 0) {
+        throw new Error('You must select an image to upload.')
+      }
+
+      const file = event.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const filePath = `${uid}-${Math.random()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      onUpload(filePath)
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message)
+      }
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt="Avatar"
+          className="w-full h-full rounded-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full rounded-full bg-gray-700" />
+      )}
+      <div className="absolute bottom-0 right-0">
+        <label
+          htmlFor="single"
+          className="flex items-center justify-center w-10 h-10 bg-pink-600 rounded-full cursor-pointer hover:bg-pink-700 transition-colors text-white"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          {uploading ? 'Uploading ...' : 'Upload'}
+        </label>
+        <input
+          style={{
+            visibility: 'hidden',
+            position: 'absolute',
+          }}
+          type="file"
+          id="single"
+          accept="image/*"
+          onChange={uploadAvatar}
+          disabled={uploading}
+        />
+      </div>
+    </div>
+  )
+}

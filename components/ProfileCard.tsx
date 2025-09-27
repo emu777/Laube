@@ -1,0 +1,44 @@
+import { useState, useEffect } from 'react';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import Link from 'next/link';
+
+type Profile = {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  location: string | null;
+  age: number | null;
+}
+
+const ProfileCard = ({ profile }: { profile: Profile }) => {
+  const supabase = useSupabaseClient();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile.avatar_url) {
+      const { data } = supabase.storage.from('avatars').getPublicUrl(profile.avatar_url);
+      setAvatarUrl(data.publicUrl);
+    }
+  }, [profile.avatar_url, supabase]);
+
+  return (
+    <Link href={`/profile/${profile.id}`} className="block transition-transform duration-200 hover:scale-105">
+      <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[160px]">
+        <div className="relative w-full aspect-square">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover " />
+          ) : (
+            <div className="w-full h-full bg-gray-700" />
+          )}
+        </div>
+        <div className="p-2.5 text-center">
+          <p className="m-0 text-sm font-bold truncate text-white">{profile.username || '未設定'}</p>
+          <p className="m-0 text-xs text-gray-400">
+            {profile.location || '未設定'}・{profile.age || '??'}歳
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+};
+export default ProfileCard;
