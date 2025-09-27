@@ -21,14 +21,12 @@ type Profile = {
   hobbies: string[] | null;
 }
 
-type UpdateProfileParams = Partial<Profile>;
-
 type AccountPageProps = {
   session: Session;
   profile: Profile;
 };
 
-export default function Account({ profile }: Omit<AccountPageProps, 'session'>) {
+export default function Account({ session, profile }: AccountPageProps) {
   const supabase = useSupabaseClient()
   const user = useUser()
   const [loading, setLoading] = useState(true)
@@ -58,7 +56,10 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
     smoking,
     bio,
     hobbies
-  }: UpdateProfileParams,
+  }: {
+    username: Profile['username'];
+    [key: string]: any;
+  },
   alertMessage: string = 'プロフを更新しました。') {
     try {
       setLoading(true)
@@ -97,10 +98,6 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
     setSexualities(prev => {
       const prevSexualities = prev || []
       if (checked) {
-        if (prevSexualities && prevSexualities.length >= 3) {
-          alert('セクシャリティは3つまで選択できます。');
-          return prevSexualities;
-        }
         return [...prevSexualities, value]
       } else {
         return prevSexualities.filter(item => item !== value)
@@ -113,11 +110,7 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
     setHobbies(prev => {
       const prevHobbies = prev || []
       if (checked) {
-        if (prevHobbies && prevHobbies.length >= 3) {
-          alert('趣味は3つまで選択できます。');
-          return prevHobbies;
-        }
-        return [...prevHobbies, value];
+        return [...prevHobbies, value]
       } else {
         return prevHobbies.filter(item => item !== value)
       }
@@ -210,14 +203,7 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
                     {sexualityOptions.map(opt => (
                       <div key={opt} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`sexuality-${opt}`}
-                          value={opt}
-                          checked={(sexualities || []).includes(opt)}
-                          onChange={handleSexualityChange}
-                          disabled={!sexualities?.includes(opt) && (sexualities?.length ?? 0) >= 3}
-                          className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600 disabled:opacity-50 disabled:cursor-not-allowed" />
+                        <input type="checkbox" id={`sexuality-${opt}`} value={opt} checked={(sexualities || []).includes(opt)} onChange={handleSexualityChange} className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600" />
                         <label htmlFor={`sexuality-${opt}`} className="ml-3 text-sm">{opt}</label>
                       </div>
                     ))}
@@ -254,14 +240,7 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
                     {hobbyOptions.map(opt => (
                       <div key={opt} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`hobby-${opt}`}
-                          value={opt}
-                          checked={(hobbies || []).includes(opt)}
-                          onChange={handleHobbyChange}
-                          disabled={!hobbies?.includes(opt) && (hobbies?.length ?? 0) >= 3}
-                          className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600 disabled:opacity-50 disabled:cursor-not-allowed" />
+                        <input type="checkbox" id={`hobby-${opt}`} value={opt} checked={(hobbies || []).includes(opt)} onChange={handleHobbyChange} className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600" />
                         <label htmlFor={`hobby-${opt}`} className="ml-3 text-sm">{opt}</label>
                       </div>
                     ))}
@@ -278,11 +257,11 @@ export default function Account({ profile }: Omit<AccountPageProps, 'session'>) 
               </div>
             </div>
 
-            <div className="flex flex-col items-center gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button onClick={() => updateProfile({ username, avatar_url, location, age, sexualities, position, drinking, smoking, bio, hobbies })} disabled={loading} className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 disabled:opacity-50 transition-colors">
                 {loading ? '保存中...' : 'プロフィールを更新'}
               </button>
-              <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors">
+              <Link href="/" className="block w-full text-center bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg no-underline transition-colors">
                 戻る
               </Link>
             </div>
