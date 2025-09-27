@@ -41,7 +41,7 @@ const Login: NextPage = () => {
               magic_link: { email_input_label: 'メールアドレス', button_label: 'マジックリンクを送信', link_text: 'マジックリンクを送信' },
               forgotten_password: { email_label: 'メールアドレス', button_label: 'パスワードをリセット', link_text: 'パスワードをお忘れですか？' },
               update_password: { password_label: '新しいパスワード', button_label: 'パスワードを更新' },
-              verify_otp: { email_input_label: 'メールアドレス', phone_input_label: '電話番号', token_input_label: 'OTP', button_label: '確認', link_text: 'OTPを再送信' }
+              verify_otp: { email_input_label: 'メールアドレス', phone_input_label: '電話番号', token_input_label: 'OTP', button_label: '確認' }
             },
           }}
           theme="dark"
