@@ -2,7 +2,6 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
@@ -25,7 +24,6 @@ type TimelinePageProps = {
 const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
   const supabase = useSupabaseClient();
   const user = useUser();
-  const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);

@@ -213,7 +213,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   let isLiked = false
 
   if (!isMyProfile) {
-    const { data: likeData, error: likeError } = await supabase
+    const { data: likeData, error: _likeError } = await supabase
       .from('likes')
       .select('*')
       .eq('liker_id', session.user.id)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
 
 type Profile = {
@@ -20,11 +20,7 @@ export default function Avatar({
   const [avatarUrl, setAvatarUrl] = useState<Profile['avatar_url']>(null)
   const [uploading, setUploading] = useState(false)
 
-  useEffect(() => {
-    if (url) downloadImage(url)
-  }, [url])
-
-  async function downloadImage(path: string) {
+  const downloadImage = useCallback(async (path: string) => {
     try {
       const { data, error } = await supabase.storage.from('avatars').download(path)
       if (error) {
@@ -35,7 +31,11 @@ export default function Avatar({
     } catch (error) {
       console.log('Error downloading image: ', error)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    if (url) downloadImage(url)
+  }, [url, downloadImage])
 
   const uploadAvatar: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
     try {

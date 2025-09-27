@@ -26,7 +26,7 @@ type AccountPageProps = {
   profile: Profile;
 };
 
-export default function Account({ session, profile }: AccountPageProps) {
+export default function Account({ profile }: AccountPageProps) {
   const supabase = useSupabaseClient()
   const user = useUser()
   const [loading, setLoading] = useState(true)
@@ -56,10 +56,7 @@ export default function Account({ session, profile }: AccountPageProps) {
     smoking,
     bio,
     hobbies
-  }: {
-    username: Profile['username'];
-    [key: string]: any;
-  },
+  }: Partial<Profile>,
   alertMessage: string = 'プロフを更新しました。') {
     try {
       setLoading(true)

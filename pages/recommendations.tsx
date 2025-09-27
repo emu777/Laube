@@ -1,7 +1,7 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
@@ -42,7 +42,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
-  const [recommendations, setRecommendations] = useState(initialRecommendations);
+  const [recommendations] = useState(initialRecommendations);
   const [newUrl, setNewUrl] = useState('');
   const [newComment, setNewComment] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -206,13 +206,13 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: recommendations, error } = await supabase
+  const { data: recommendations, error: _error } = await supabase
     .from('recommendations')
     .select('*, category, profiles(username, avatar_url)')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching recommendations:', error);
+  if (_error) {
+    console.error('Error fetching recommendations:', _error);
   }
 
   return {
