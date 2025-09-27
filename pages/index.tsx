@@ -24,7 +24,7 @@ const Home: NextPage<HomePageProps> = ({ profiles }) => {
   const [showAllActive, setShowAllActive] = useState(false);
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-4xl mx-auto space-y-8">

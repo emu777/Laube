@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import Image from 'next/image';
 
 type AvatarIconProps = {
   avatarUrlPath: string | null;
@@ -25,7 +26,13 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
         style={{ width: size, height: size }}
       >
         {publicUrl ? (
-          <img src={publicUrl} alt="avatar" className="w-full h-full object-cover" />
+          <Image
+            src={publicUrl}
+            alt="avatar"
+            className="w-full h-full object-cover"
+            width={size}
+            height={size}
+          />
         ) : (
           <div className="w-full h-full bg-gray-700" />
         )}

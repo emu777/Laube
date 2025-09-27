@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 type Profile = {
@@ -26,7 +27,13 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
       <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[160px]">
         <div className="relative w-full aspect-square">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover " />
+            <Image
+              src={avatarUrl}
+              alt="avatar"
+              className="w-full h-full object-cover"
+              fill
+              sizes="160px"
+            />
           ) : (
             <div className="w-full h-full bg-gray-700" />
           )}

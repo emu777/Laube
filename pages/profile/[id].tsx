@@ -3,6 +3,7 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 
@@ -76,13 +77,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
   }
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6">
           <div className="relative w-full mx-auto aspect-[4/5] max-h-[500px] sm:max-h-[640px] sm:rounded-xl overflow-hidden shadow-lg">
-              {avatarUrl ? (
-              <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt="avatar"
+                className="w-full h-full object-cover"
+                fill
+                priority
+              />
               ) : (
               <div className="w-full h-full bg-gray-700" />
               )}

@@ -34,6 +34,16 @@ const Login: NextPage = () => {
               input: { background: '#1f2937', color: 'white', borderColor: '#4b5563', borderRadius: '8px' },
             },
           }}
+          localization={{
+            variables: {
+              sign_up: { email_label: 'メールアドレス', password_label: 'パスワード', button_label: '新規登録', social_provider_text: '{{provider}}で続行', link_text: 'アカウントをお持ちでないですか？新規登録' },
+              sign_in: { email_label: 'メールアドレス', password_label: 'パスワード', button_label: 'ログイン', social_provider_text: '{{provider}}で続行', link_text: 'すでにアカウントをお持ちですか？ログイン' },
+              magic_link: { email_input_label: 'メールアドレス', button_label: 'マジックリンクを送信', link_text: 'マジックリンクを送信' },
+              forgotten_password: { email_label: 'メールアドレス', button_label: 'パスワードをリセット', link_text: 'パスワードをお忘れですか？' },
+              update_password: { password_label: '新しいパスワード', button_label: 'パスワードを更新' },
+              verify_otp: { email_input_label: 'メールアドレス', phone_input_label: '電話番号', token_input_label: 'OTP', button_label: '確認', link_text: 'OTPを再送信' }
+            },
+          }}
           theme="dark"
           providers={['google']} // 'github'や'apple'など、他のプロバイダーも追加できます
         />
@@ -41,6 +51,7 @@ const Login: NextPage = () => {
     </div>
   )
 }
+
 
 export default Login
 

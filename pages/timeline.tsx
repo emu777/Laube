@@ -3,6 +3,7 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 
@@ -109,7 +110,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-4xl mx-auto">
@@ -119,8 +120,15 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
           <div className="space-y-4">
             {posts.map((post) => (              <div key={post.id} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl flex space-x-4 shadow-md relative">
                 <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
-                  <div className="w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
-                    {post.profiles?.avatar_url && avatarUrls[post.profiles.avatar_url] && <img src={avatarUrls[post.profiles.avatar_url]!} alt="avatar" className="w-full h-full object-cover" />}
+                  <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
+                    {post.profiles?.avatar_url && avatarUrls[post.profiles.avatar_url] && (
+                      <Image
+                        src={avatarUrls[post.profiles.avatar_url]!}
+                        alt="avatar"
+                        className="object-cover"
+                        fill
+                      />
+                    )}
                   </div>
                 </Link>
                 <div className="flex-1 flex flex-col">

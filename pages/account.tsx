@@ -138,7 +138,7 @@ export default function Account({ profile }: AccountPageProps) {
   const smokingOptions = ['紙タバコ', '電子タバコ', '吸わない']
 
   const hobbyOptions = [
-    '音楽', 'ゲーム', '動物', '映画', 'スポーツ', '読書', '料理', 'ドライブ', '観劇', 'グルメ・カフェ', 'ものづくり', 'アウトドア', 'インドア'
+    '音楽', 'ゲーム', '動物', '映画', 'スポーツ', '読書', '美容', 'グルメ・カフェ', '料理', 'ドライブ', '観劇', 'ものづくり', 'アウトドア', 'インドア'
   ]
 
   if (!user) return null;

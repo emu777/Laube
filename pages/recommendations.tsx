@@ -77,7 +77,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
     }
   };
 
-  const categories = ['すべて', '音楽', '動物', 'ゲーム', '映画', 'お笑い', 'Vlog', 'エンタメ', '学習', 'その他'];
+  const categories = ['すべて', '音楽', '動物', 'ゲーム', '映画', 'お笑い', '美容', '日常', 'エンタメ', '学習', 'その他'];
   const [filterCategory, setFilterCategory] = useState('すべて');
 
   const filteredRecommendations = recommendations.filter(rec => {
@@ -86,7 +86,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
   });
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-4xl mx-auto">
