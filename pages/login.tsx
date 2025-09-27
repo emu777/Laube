@@ -1,6 +1,6 @@
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSession, useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { NextPage, GetServerSidePropsContext } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/router';
@@ -10,6 +10,7 @@ const Login: NextPage = () => {
   const session = useSession()
   const supabase = useSupabaseClient()
   const router = useRouter()
+  const { view } = router.query;
 
   useEffect(() => {
     if (session) {
@@ -27,6 +28,7 @@ const Login: NextPage = () => {
         <h1 className="text-4xl font-bold text-white text-center mb-8">Laube</h1>
         <Auth
           supabaseClient={supabase}
+          view={view === 'sign_up' ? 'sign_up' : 'sign_in'}
           appearance={{
             theme: ThemeSupa,
             style: {

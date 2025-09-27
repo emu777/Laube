@@ -3,8 +3,10 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import Header from '@/components/Header'
-import BottomNav from '@/components/BottomNav'
+import Link from 'next/link';
+import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
+import AvatarIcon from '@/components/AvatarIcon';
 
 type Recommendation = {
   id: string;
@@ -127,7 +129,12 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                       <span className="inline-block bg-gray-700 text-gray-300 text-xs font-semibold px-2 py-1 rounded-full mb-2">{rec.category}</span>
                     )}
                     <p className="text-sm text-gray-300 whitespace-pre-wrap">{rec.comment}</p>
-                    <p className="text-xs text-gray-500 mt-2">投稿者: {rec.profiles?.username || '匿名さん'}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Link href={`/profile/${rec.user_id}`}>
+                        <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
+                      </Link>
+                      <Link href={`/profile/${rec.user_id}`} className="text-xs text-gray-400 hover:text-white transition-colors"><span>{rec.profiles?.username || '匿名さん'}</span><span>のオススメ</span></Link>
+                    </div>
                   </div>
                 </div>
               ) : null;

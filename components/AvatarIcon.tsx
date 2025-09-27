@@ -3,7 +3,7 @@ import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import Image from 'next/image';
 
 type AvatarIconProps = {
-  avatarUrlPath: string | null;
+  avatarUrlPath: string | null | undefined;
   size: number;
   isActive?: boolean;
 };
