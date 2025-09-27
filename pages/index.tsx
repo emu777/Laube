@@ -89,7 +89,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   const { data: profiles, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, location, age')
+    .select('id, username, avatar_url, location, age, last_seen')
+    // 最終アクティビティが5分以内のユーザーをオンラインとみなす
+    .gt('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+    .order('last_seen', { ascending: false });
 
   if (error) {
     console.error('Error fetching profiles:', error)

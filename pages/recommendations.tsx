@@ -128,13 +128,13 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                     {rec.category && (
                       <span className="inline-block bg-gray-700 text-gray-300 text-xs font-semibold px-2 py-1 rounded-full mb-2">{rec.category}</span>
                     )}
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap">{rec.comment}</p>
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-2">
                       <Link href={`/profile/${rec.user_id}`}>
                         <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
                       </Link>
                       <Link href={`/profile/${rec.user_id}`} className="text-xs text-gray-400 hover:text-white transition-colors"><span>{rec.profiles?.username || '匿名さん'}</span><span>のオススメ</span></Link>
                     </div>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap mt-2">{rec.comment}</p>
                   </div>
                 </div>
               ) : null;
