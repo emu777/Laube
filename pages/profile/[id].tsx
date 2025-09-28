@@ -1,6 +1,7 @@
 import { GetServerSidePropsContext, NextPage } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
+import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -28,12 +29,14 @@ type Profile = {
 type ProfilePageProps = {
   profile: Profile | null
   isLiked: boolean
+  isLikedBy: boolean
   isMyProfile: boolean
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isMyProfile }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile }) => {
   const supabase = useSupabaseClient()
   const user = useUser()
+  const router = useRouter()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isLiked, setIsLiked] = useState(initialIsLiked)
 
@@ -43,6 +46,29 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
       setAvatarUrl(data.publicUrl)
     }
   }, [profile, supabase])
+
+  const createChatRoom = async () => {
+    if (!user || !profile) return;
+
+    // To prevent duplicate rooms, always store the smaller ID in user1_id
+    const user1 = user.id < profile.id ? user.id : profile.id;
+    const user2 = user.id > profile.id ? user.id : profile.id;
+
+    const { data, error } = await supabase
+      .from('chat_rooms')
+      .insert({ user1_id: user1, user2_id: user2 })
+      .select()
+      .single();
+
+    if (error && error.code !== '23505') { // 23505 is unique_violation
+      console.error('Error creating chat room:', error);
+      alert('チャットルームの作成に失敗しました。');
+    } else {
+      alert('マッチング成功！メッセージを送ってみましょう。');
+      // TODO: 将来的にチャットページへ遷移させる
+      // router.push(`/chat/${data.id}`);
+    }
+  };
 
   const handleLike = async () => {
     if (!user || !profile || isMyProfile) return
@@ -56,15 +82,40 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
         setIsLiked(false)
       }
     } else {
-      // いいねする
+      // いいねする (マッチング成立かチェック)
       const { error } = await supabase.from('likes').insert({ liker_id: user.id, liked_id: profile.id })
       if (error) {
         console.error('Error liking profile:', error)
       } else {
         setIsLiked(true)
+        if (isLikedBy) {
+          // 相手も自分をいいねしていたらマッチング成立
+          await createChatRoom();
+        }
       }
     }
   }
+
+  const handleMatch = async () => {
+    if (!user || !profile || isMyProfile) return;
+    // 念のため、自分のいいねも作成する
+    await supabase.from('likes').upsert({ liker_id: user.id, liked_id: profile.id });
+    setIsLiked(true);
+    await createChatRoom();
+  };
+
+  const handleReject = async () => {
+    if (!user || !profile || isMyProfile) return;
+    // 相手からのいいねを削除する
+    const { error } = await supabase.from('likes').delete().match({ liker_id: profile.id, liked_id: user.id });
+    if (error) {
+      console.error('Error rejecting like:', error);
+    } else {
+      alert('いいねを拒否しました。');
+      // UIからボタンを消すために状態を更新（ページをリロードさせても良い）
+      window.location.reload(); // 簡単な実装としてリロード
+    }
+  };
 
   if (!profile) {
     return (
@@ -83,75 +134,83 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
-      <main className="p-4 pt-24 pb-24">
-        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6">
-          <div className="relative w-full mx-auto aspect-[4/5] max-h-[500px] sm:max-h-[640px] sm:rounded-xl overflow-hidden shadow-lg">
-            {avatarUrl ? (
-              <Image
-                src={avatarUrl}
-                alt="avatar"
-                className="w-full h-full object-cover"
-                fill
-                priority
-              />
-              ) : (
-              <div className="w-full h-full bg-gray-700 flex items-center justify-center">
-                <span className="text-gray-400 text-2xl">No image</span>
-              </div>
-              )}
-
-            {/* 名前・居住地・年齢 */}
-            <div className="absolute bottom-0 left-0 p-4 text-white bg-gradient-to-t from-black/70 to-transparent w-full">
-              <h1 className="text-xl font-bold drop-shadow-md">{profile.username || '未設定'}</h1>
-              <div className="text-gray-200 text-xs drop-shadow-md mt-1">
-                {(profile.location || profile.age) && (
-                  <>
-                    <span>{profile.location || '未設定'}</span>
-                    {profile.location && profile.age && <span className="mx-1">/</span>}
-                    {profile.age && <span>{profile.age}歳</span>}
-                  </>
+      <main className="p-4 pt-20 sm:pt-24 pb-24">
+        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6 relative">
+          {/* 閉じるボタン */}
+          <button onClick={() => router.back()} className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-gray-700/80 rounded-full p-2 text-white hover:bg-gray-600/80 transition-colors z-10" aria-label="閉じる">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="w-full mx-auto aspect-[4/5] max-h-[500px] sm:max-h-[640px] sm:rounded-xl overflow-hidden shadow-lg">
+            <div className="relative w-full h-full">
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt="avatar"
+                  className="w-full h-full object-cover"
+                  fill
+                  priority
+                />
+                ) : (
+                <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                  <span className="text-gray-400 text-2xl">No image</span>
+                </div>
                 )}
-              </div>
-              <div className="text-gray-200 text-xs drop-shadow-md mt-1">
-                {(profile.sexualities && profile.sexualities.length > 0 || profile.position) && (
-                  <>
-                    <span>{profile.sexualities?.join(' / ') || '未設定'}</span>
-                    {profile.sexualities && profile.sexualities.length > 0 && profile.position && <span className="mx-1">/</span>}
-                    {profile.position && <span>{profile.position}</span>}
-                  </>
-                )}
-              </div>
-            </div>
 
-            {/* いいねボタン */}
-            {!isMyProfile && (
-              <div className="absolute bottom-4 right-4">
-                <button
-                  onClick={handleLike}
-                  className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center border-4 border-gray-800 shadow-xl ${
-                    isLiked
-                      ? 'bg-pink-500 text-white'
-                      : 'bg-white text-pink-500 hover:bg-pink-50'
-                  }`}
-                  aria-label={isLiked ? 'いいねを取り消す' : 'いいねする'}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8"
-                    fill={isLiked ? 'currentColor' : 'none'}
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+              {/* 名前・居住地・年齢 */}
+              <div className="absolute bottom-0 left-0 p-4 text-white bg-gradient-to-t from-black/70 to-transparent w-full">
+                <h1 className="text-xl font-bold drop-shadow-md">{profile.username || '未設定'}</h1>
+                <div className="text-gray-200 text-xs drop-shadow-md mt-1">
+                  {(profile.location || profile.age) && (
+                    <>
+                      <span>{profile.location || '未設定'}</span>
+                      {profile.location && profile.age && <span className="mx-1">/</span>}
+                      {profile.age && <span>{profile.age}歳</span>}
+                    </>
+                  )}
+                </div>
+                <div className="text-gray-200 text-xs drop-shadow-md mt-1">
+                  {(profile.sexualities && profile.sexualities.length > 0 || profile.position) && (
+                    <>
+                      <span>{profile.sexualities?.join(' / ') || '未設定'}</span>
+                      {profile.sexualities && profile.sexualities.length > 0 && profile.position && <span className="mx-1">/</span>}
+                      {profile.position && <span>{profile.position}</span>}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* いいねボタン */}
+              {!isMyProfile && (
+                <div className="absolute bottom-4 right-4">
+                  <button
+                    onClick={handleLike}
+                    className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center border-4 border-gray-800 shadow-xl ${
+                      isLiked
+                        ? 'bg-pink-500 text-white'
+                        : 'bg-white text-pink-500 hover:bg-pink-50'
+                    }`}
+                    aria-label={isLiked ? 'いいねを取り消す' : 'いいねする'}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            )}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-8 w-8"
+                      fill={isLiked ? 'currentColor' : 'none'}
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {profile.hobbies && profile.hobbies.length > 0 && (
@@ -213,11 +272,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
             )}
           </div>
 
-          <div className="pt-4">
-            <Link href="/" className="block w-full text-center bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded no-underline">
-              一覧に戻る
-            </Link>
-          </div>
+          {/* マッチングボタン */}
+          {isLikedBy && !isLiked && !isMyProfile && (
+            <div className="pt-4 space-y-3">
+              <p className="text-center text-pink-400 text-sm">相手はあなたに興味を持っています！</p>
+              <button onClick={handleMatch} className="w-full p-3 bg-gradient-to-r from-pink-500 to-orange-400 text-white font-bold rounded-lg hover:opacity-90 transition-opacity">
+                両想いになる
+              </button>
+              <button onClick={handleReject} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+                拒否する
+              </button>
+            </div>
+          )}
+
         </div>
       </main>
       <BottomNav />
@@ -243,23 +310,32 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     .single()
 
   if (error || !profile) {    
-    return { props: { profile: null, isLiked: false, isMyProfile: false } }
+    return { props: { profile: null, isLiked: false, isLikedBy: false, isMyProfile: false } }
   }
 
   const isMyProfile = session.user.id === profile.id
   let isLiked = false
+  let isLikedBy = false
 
   if (!isMyProfile) {
-    const { data: likeData, error: _likeError } = await supabase
+    // 自分が相手をいいねしているか
+    const { count: likeCount } = await supabase
       .from('likes')
-      .select('*')
+      .select('*', { count: 'exact', head: true })
       .eq('liker_id', session.user.id)
       .eq('liked_id', profile.id)
-      .single()
-    isLiked = !!likeData
+    isLiked = (likeCount ?? 0) > 0;
+
+    // 相手が自分をいいねしているか
+    const { count: likedByCount } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('liker_id', profile.id)
+      .eq('liked_id', session.user.id)
+    isLikedBy = (likedByCount ?? 0) > 0;
   }
 
   return {
-    props: { profile, isLiked, isMyProfile },
+    props: { profile, isLiked, isLikedBy, isMyProfile },
   }
 }

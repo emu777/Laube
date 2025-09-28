@@ -211,7 +211,7 @@ export default function Account({ profile }: AccountPageProps) {
               size={150}
               onUpload={(url) => {
                 setAvatarUrl(url)
-                updateProfile({ avatar_url: url }, 'プロフィール画像を更新しました。')
+                updateProfile({ avatar_url: url }, 'プロフィール画像を更新しました。');
               }}
             />
           </div>
