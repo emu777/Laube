@@ -1,6 +1,7 @@
 import { GetServerSidePropsContext, NextPage } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Header from '@/components/Header'
 import ProfileCard from '@/components/ProfileCard'
@@ -14,15 +15,34 @@ type Profile = {
   avatar_url: string | null;
   location: string | null;
   age: number | null;
+  last_seen: string | null;
 }
 
 type HomePageProps = {
-  profiles: Profile[]
+  profiles: Profile[];
+  isNewUser: boolean;
 }
 
-const Home: NextPage<HomePageProps> = ({ profiles }) => {
-  const [showAllActive, setShowAllActive] = useState(false);
+const Home: NextPage<HomePageProps> = ({ profiles, isNewUser }) => {
+  const router = useRouter();
 
+  useEffect(() => {
+    if (isNewUser) {
+      alert('アカウントご登録ありがとうございます！最初にプロフィールのご入力をお願いします。');
+      router.push('/account');
+    }
+  }, [isNewUser, router]);
+
+  const [showAllActive, setShowAllActive] = useState(false);
+  
+  // 5分以内にアクティビティがあったユーザーをオンラインとみなす
+  const activeProfiles = profiles.filter(profile => {
+    if (!profile.last_seen) return false;
+    const lastSeen = new Date(profile.last_seen).getTime();
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    return lastSeen > fiveMinutesAgo;
+  });
+  
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
@@ -32,7 +52,7 @@ const Home: NextPage<HomePageProps> = ({ profiles }) => {
           <div className="bg-gray-800/50 border border-gray-700/80 rounded-xl p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 overflow-hidden">
-                {profiles.slice(0, 7).map(profile => (
+                {activeProfiles.slice(0, 7).map(profile => (
                   <Link key={profile.id} href={`/profile/${profile.id}`}>
                     <AvatarIcon avatarUrlPath={profile.avatar_url} size={32} isActive={true} />
                   </Link>
@@ -47,7 +67,7 @@ const Home: NextPage<HomePageProps> = ({ profiles }) => {
               <div className="mt-4 pt-4 border-t border-white/10">
                 <h3 className="text-sm font-semibold text-gray-300 mb-3">アクティブなユーザー</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {profiles.map(profile => (
+                  {activeProfiles.map(profile => (
                     <Link key={profile.id} href={`/profile/${profile.id}`} className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-700/60 transition-colors">
                       <AvatarIcon avatarUrlPath={profile.avatar_url} size={40} isActive={true} />
                       <span className="text-sm truncate text-white">{profile.username || '未設定'}</span>
@@ -87,12 +107,19 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     }
   }
 
+  // ログインユーザーのプロフィールを取得して新規ユーザーか判定
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', session.user.id)
+    .maybeSingle();
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select('id, username, avatar_url, location, age, last_seen')
-    // 最終アクティビティが5分以内のユーザーをオンラインとみなす
-    .gt('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-    .order('last_seen', { ascending: false });
+    // ユーザー名が設定されているユーザーのみ取得
+    .not('username', 'is', null)
+    // last_seenが新しい順に並び替え、nullは最後にする
+    .order('last_seen', { ascending: false, nullsFirst: false });
 
   if (error) {
     console.error('Error fetching profiles:', error)
@@ -102,6 +129,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   return {
     props: {
       profiles: profiles || [],
+      isNewUser: !userProfile?.username,
     },
   }
 }

@@ -25,12 +25,24 @@ export default function MyApp({
     router.events.on('routeChangeComplete', handleComplete)
     router.events.on('routeChangeError', handleComplete)
 
+    // 5分ごとに最終アクティビティを更新
+    const interval = setInterval(async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        await supabaseClient
+          .from('profiles')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', session.user.id);
+      }
+    }, 5 * 60 * 1000);
+
     return () => {
       router.events.off('routeChangeStart', handleStart)
       router.events.off('routeChangeComplete', handleComplete)
       router.events.off('routeChangeError', handleComplete)
+      clearInterval(interval);
     }
-  }, [router])
+  }, [router, supabaseClient])
 
   return (
     <>

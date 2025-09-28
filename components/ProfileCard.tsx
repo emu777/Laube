@@ -35,7 +35,9 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
               sizes="160px"
             />
           ) : (
-            <div className="w-full h-full bg-gray-700" />
+            <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+              <span className="text-gray-400">No image</span>
+            </div>
           )}
         </div>
         <div className="p-2.5 text-center">

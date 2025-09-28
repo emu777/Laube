@@ -5,7 +5,24 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Header from '@/components/Header'
+import { FaRegComment } from 'react-icons/fa';
 import BottomNav from '@/components/BottomNav'
+
+type Comment = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
+  parent_post?: {
+    user_id: string;
+    profiles: { username: string | null; avatar_url: string | null; }[] | null;
+  } | null;
+};
 
 type Post = {
   id: string;
@@ -16,33 +33,47 @@ type Post = {
     username: string | null;
     avatar_url: string | null;
   } | null;
+  comments: Comment[];
 };
+
+type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'comment' });
 
 type TimelinePageProps = {
-  initialPosts: Post[];
+  initialItems: TimelineItem[];
 };
 
-const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
+const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
   const supabase = useSupabaseClient();
   const user = useUser();
-  const [posts, setPosts] = useState(initialPosts);
+  const [items, setItems] = useState(initialItems);
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
+  const [newCommentContent, setNewCommentContent] = useState('');
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     const fetchAvatars = async () => {
       const urls: Record<string, string | null> = {};
-      for (const post of posts) {
-        if (post.profiles?.avatar_url && !urls[post.profiles.avatar_url]) {
-          const { data } = supabase.storage.from('avatars').getPublicUrl(post.profiles.avatar_url);
-          urls[post.profiles.avatar_url] = data.publicUrl;
+      const avatarPaths = new Set<string>();
+
+      items.forEach(item => {
+        if (item.profiles?.avatar_url) avatarPaths.add(item.profiles.avatar_url);
+        if (item.item_type === 'comment' && Array.isArray(item.parent_post?.profiles) && item.parent_post?.profiles[0]?.avatar_url) {
+          avatarPaths.add(item.parent_post.profiles[0].avatar_url);
+        }
+      });
+
+      for (const path of Array.from(avatarPaths)) {
+        if (path && !urls[path]) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+          urls[path] = data.publicUrl;
         }
       }
       setAvatarUrls(urls);
     };
     fetchAvatars();
-  }, [posts, supabase]);
+  }, [items, supabase]);
 
   // リアルタイムで新しい投稿を購読する
   useEffect(() => {
@@ -52,33 +83,68 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'posts' },
         async (payload) => {
-          // 新しい投稿データを取得
           const newPost = payload.new as Post;
-
-          // 投稿者のプロフィール情報を取得
           const { data: profile } = await supabase
             .from('profiles')
             .select('username, avatar_url')
             .eq('id', newPost.user_id)
             .single();
-
-          // 新しい投稿オブジェクトを作成し、投稿一覧の先頭に追加
-          setPosts((currentPosts) => [{ ...newPost, profiles: profile }, ...currentPosts]);
+          setItems((currentItems) => [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...currentItems]);
         }
       )
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'posts' },
         (payload) => {
-          setPosts((currentPosts) => currentPosts.filter(post => post.id !== payload.old.id));
+          setItems((currentItems) => currentItems.filter(item => item.id !== payload.old.id));
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'comments' },
+        async (payload) => {
+          const newComment = payload.new as Comment;
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', newComment.user_id)
+            .single();
+
+          const { data: parentPostProfile } = await supabase
+            .from('posts')
+            .select('user_id, profiles(username, avatar_url)')
+            .eq('id', newComment.post_id)
+            .single();
+
+          setItems(currentItems => {
+            // 元の投稿をタイムラインから探す
+            const parentPostIndex = currentItems.findIndex(item => item.item_type === 'post' && item.id === newComment.post_id);
+            if (parentPostIndex === -1) return currentItems; // 元の投稿が見つからない場合は何もしない
+
+            // 元の投稿の情報をコピーし、新しいコメント情報を追加する
+            const parentPost = { ...currentItems[parentPostIndex] } as Post & { item_type: 'post' };
+            const newCommentForPost: Comment = { ...newComment, profiles: profile, parent_post: parentPostProfile };
+            parentPost.comments = [newCommentForPost, ...parentPost.comments];
+
+            // 新しいコメントアイテムを作成
+            const newCommentItem: TimelineItem = {
+              ...newComment,
+              profiles: profile,
+              parent_post: parentPostProfile,
+              item_type: 'comment'
+            };
+            
+            // タイムラインから元の投稿を一旦削除し、コメントと元の投稿を先頭に追加する
+            const filteredItems = currentItems.filter((_, index) => index !== parentPostIndex);
+            return [parentPost, newCommentItem, ...filteredItems];
+          });
+        })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, setPosts]);
+  }, [supabase, setItems]);
 
   const handlePost = async () => {
     if (!newPostContent.trim() || !user) return;
@@ -92,6 +158,22 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
     } else {
       setNewPostContent('');
       setIsFormOpen(false);
+    }
+  };
+
+  const handleComment = async (postId: string) => {
+    if (!newCommentContent.trim() || !user) return;
+
+    const { error } = await supabase
+      .from('comments')
+      .insert({ content: newCommentContent, user_id: user.id, post_id: postId });
+
+    if (error) {
+      console.error('Error creating comment:', error);
+      alert('コメントの投稿に失敗しました。');
+    } else {
+      setNewCommentContent('');
+      setCommentingPostId(null);
     }
   };
 
@@ -118,46 +200,122 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts }) => {
 
           {/* 投稿一覧 */}
           <div className="space-y-4">
-            {posts.map((post) => (              <div key={post.id} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl flex space-x-4 shadow-md relative">
-                <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
-                  <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
-                    {post.profiles?.avatar_url && avatarUrls[post.profiles.avatar_url] && (
-                      <Image
-                        src={avatarUrls[post.profiles.avatar_url]!}
-                        alt="avatar"
-                        className="object-cover"
-                        fill
-                      />
-                    )}
-                  </div>
-                </Link>
-                <div className="flex-1 flex flex-col">
-                  <div className="flex-1">
-                    <div className="flex items-baseline space-x-2">
-                      <p className="font-bold">{post.profiles?.username || '匿名さん'}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(post.created_at).toLocaleString('ja-JP')}
-                      </p>
+            {items.map((item) => {
+              if (item.item_type === 'comment') {
+                return (
+                  <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
+                    <div className="flex space-x-4">
+                      <Link href={`/profile/${item.user_id}`} className="flex-shrink-0 cursor-pointer">
+                        <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
+                          {item.profiles?.avatar_url && avatarUrls[item.profiles.avatar_url] && (
+                            <Image src={avatarUrls[item.profiles.avatar_url]!} alt="avatar" className="object-cover" fill />
+                          )}
+                        </div>
+                      </Link>
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-400 mb-2">
+                          <Link href={`/profile/${item.parent_post?.user_id}`} className="font-bold text-pink-400 hover:underline">
+                            {(Array.isArray(item.parent_post?.profiles) && item.parent_post.profiles[0]?.username) || '匿名さん'}
+                          </Link>
+                          <span>さんへのコメント</span>
+                        </div>
+                        <div className="flex items-baseline space-x-2">
+                          <p className="font-bold">{item.profiles?.username || '匿名さん'}</p>
+                          <p className="text-xs text-gray-500">{new Date(item.created_at).toLocaleString('ja-JP')}</p>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap break-words">{item.content}</p>
+                      </div>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap">{post.content}</p>
                   </div>
-                  {user && user.id === post.user_id && (
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        onClick={() => handleDelete(post.id)}
-                        className="delete-button"
-                        aria-label="投稿を削除"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span>削除</span>
-                      </button>
+                )
+              }
+
+              // 通常の投稿
+              const post = item;
+              return (
+                <div key={post.id}>
+                  <div className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
+                    <div className="flex space-x-4">
+                      <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
+                        <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
+                          {post.profiles?.avatar_url && avatarUrls[post.profiles.avatar_url] && (
+                            <Image
+                              src={avatarUrls[post.profiles.avatar_url]!}
+                              alt="avatar"
+                              className="object-cover"
+                              fill
+                            />
+                          )}
+                        </div>
+                      </Link>
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex-1">
+                          <div className="flex items-baseline space-x-2">
+                            <p className="font-bold">{post.profiles?.username || '匿名さん'}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(post.created_at).toLocaleString('ja-JP')}
+                            </p>
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap break-words">{post.content}</p>
+                        </div>
+                        <div className="mt-3 flex items-center justify-end gap-4">
+                          <button onClick={() => setCommentingPostId(commentingPostId === post.id ? null : post.id)} className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors">
+                            <FaRegComment />
+                            <span className="text-xs">{post.comments.length}</span>
+                          </button>
+                          {user && user.id === post.user_id && (
+                              <button
+                                onClick={() => handleDelete(post.id)}
+                                className="delete-button"
+                                aria-label="投稿を削除"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs">削除</span>
+                              </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {commentingPostId === post.id && (
+                    <div className="pl-10 pr-4 -mt-2 mb-2">
+                      {/* コメント一覧 */}
+                      <div className="space-y-3 mt-4 border-t border-gray-700 pt-4">
+                        {post.comments.map(comment => (
+                          <div key={comment.id} className="flex items-start space-x-3">
+                            <Link href={`/profile/${comment.user_id}`} className="flex-shrink-0">
+                              <div className="relative w-7 h-7 rounded-full bg-gray-600 overflow-hidden">
+                                {comment.profiles?.avatar_url && avatarUrls[comment.profiles.avatar_url] && (
+                                  <Image src={avatarUrls[comment.profiles.avatar_url]!} alt="avatar" fill className="object-cover" />
+                                )}
+                              </div>
+                            </Link>
+                            <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">
+                              <p className="text-sm font-bold">{comment.profiles?.username || '匿名さん'}</p>
+                              <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap break-words">{comment.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* コメント投稿フォーム */}
+                      <div className="mt-4 flex items-center gap-2">
+                        <input
+                          type="text"
+                          className="w-full bg-gray-700/50 p-2 rounded-full border border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 placeholder-gray-500 text-sm px-4"
+                          placeholder="コメントを追加..."
+                          value={newCommentContent}
+                          onChange={(e) => setNewCommentContent(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleComment(post.id)}
+                        />
+                        <button onClick={() => handleComment(post.id)} className="text-pink-500 hover:text-pink-400 disabled:opacity-50" disabled={!newCommentContent.trim()}>送信</button>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
@@ -213,18 +371,33 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: posts, error } = await supabase
+  const { data: postsData, error: postsError } = await supabase
     .from('posts')
-    .select('*, user_id, profiles(username, avatar_url)')
+    .select('*, profiles!inner(username, avatar_url), comments(*, profiles!inner(username, avatar_url))')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching posts:', error);
+  if (postsError) {
+    console.error('Error fetching posts:', postsError);
   }
+
+  const { data: commentsData, error: commentsError } = await supabase
+    .from('comments')
+    .select('*, profiles!inner(username, avatar_url), parent_post:post_id(user_id, profiles(username, avatar_url))')
+    .order('created_at', { ascending: false });
+
+  if (commentsError) {
+    console.error('Error fetching comments:', commentsError);
+  }
+
+  const posts: TimelineItem[] = (postsData || []).map(p => ({ ...p, item_type: 'post' }));
+  const comments: TimelineItem[] = (commentsData || []).map(c => ({ ...c, item_type: 'comment' } as Comment & { item_type: 'comment' }));
+
+  const initialItems = [...posts, ...comments]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return {
     props: {
-      initialPosts: posts || [],
+      initialItems,
     },
   };
 };

@@ -19,6 +19,10 @@ type Profile = {
   smoking: string | null
   bio: string | null
   hobbies: string[] | null;
+  partner_status: string | null;
+  marital_status: string | null;
+  dating_experience: string | null;
+  mbti: string | null;
 }
 
 type ProfilePageProps = {
@@ -91,7 +95,9 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
                 priority
               />
               ) : (
-              <div className="w-full h-full bg-gray-700" />
+              <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                <span className="text-gray-400 text-2xl">No image</span>
+              </div>
               )}
 
             {/* 名前・居住地・年齢 */}
@@ -148,13 +154,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
             )}
           </div>
 
-          {profile.bio && (
-            <>
-              <div className="border-t border-gray-700 my-4" />
-              <p className="text-sm text-center whitespace-pre-wrap leading-relaxed text-gray-300">{profile.bio}</p>
-            </>
-          )}
-
           {profile.hobbies && profile.hobbies.length > 0 && (
             <>
               <div className="border-t border-white/10 my-4" />
@@ -166,9 +165,40 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
             </>
           )}
 
+          {profile.bio && (
+            <>
+              <div className="border-t border-white/10 my-4" />
+              <p className="text-sm text-center whitespace-pre-wrap leading-relaxed text-gray-300">{profile.bio}</p>
+            </>
+          )}
+
           <div className="border-t border-white/10 my-4" />
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            {profile.partner_status && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">恋人</span>
+                <span className="font-semibold text-white">{profile.partner_status}</span>
+              </div>
+            )}
+            {profile.marital_status && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">結婚・子供</span>
+                <span className="font-semibold text-white">{profile.marital_status}</span>
+              </div>
+            )}
+            {profile.dating_experience && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">女性との交際歴</span>
+                <span className="font-semibold text-white">{profile.dating_experience}</span>
+              </div>
+            )}
+            {profile.mbti && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">MBTI</span>
+                <span className="font-semibold text-white">{profile.mbti}</span>
+              </div>
+            )}
             {profile.drinking && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">お酒</span>
