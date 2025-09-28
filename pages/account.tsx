@@ -51,7 +51,7 @@ export default function Account({ profile }: AccountPageProps) {
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
 
   const isFormInvalid = useMemo(() => {
-    return !username?.trim() || !location || !age || sexualities.length === 0 || !position || !partnerStatus || !maritalStatus;
+    return !username?.trim() || !location || !age || !sexualities || sexualities.length === 0 || !position || !partnerStatus || !maritalStatus;
   }, [username, location, age, sexualities, position, partnerStatus, maritalStatus]);
 
   useEffect(() => {
