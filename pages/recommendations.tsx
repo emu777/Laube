@@ -213,11 +213,32 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: recommendations, error: _error } = await supabase
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      if (block.blocker_id === session.user.id) {
+        blockedUserIds.add(block.blocked_id);
+      }
+      if (block.blocked_id === session.user.id) {
+        blockedUserIds.add(block.blocker_id);
+      }
+    }
+  }
+
+  // 2. オススメを取得 (ブロックしたユーザーは除外)
+  let recommendationsQuery = supabase
     .from('recommendations')
     .select('*, category, profiles(username, avatar_url)')
     .order('created_at', { ascending: false });
-
+  if (blockedUserIds.size > 0) {
+    recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+  }
+  const { data: recommendations, error: _error } = await recommendationsQuery;
   if (_error) {
     console.error('Error fetching recommendations:', _error);
   }

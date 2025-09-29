@@ -371,29 +371,45 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: postsData, error: postsError } = await supabase
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      if (block.blocker_id === session.user.id) {
+        blockedUserIds.add(block.blocked_id);
+      }
+      if (block.blocked_id === session.user.id) {
+        blockedUserIds.add(block.blocker_id);
+      }
+    }
+  }
+  const blockedUserIdsArray = Array.from(blockedUserIds);
+
+  // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
+  let postsQuery = supabase
     .from('posts')
-    .select('*, profiles!inner(username, avatar_url), comments(*, profiles!inner(username, avatar_url))')
+    .select('*, profiles(username, avatar_url), comments(*, profiles(username, avatar_url))')
     .order('created_at', { ascending: false });
+
+  if (blockedUserIdsArray.length > 0) {
+    // ブロックしたユーザーの投稿を除外
+    postsQuery = postsQuery.not('user_id', 'in', `(${blockedUserIdsArray.join(',')})`);
+    // 投稿に紐づくコメントから、ブロックしたユーザーのものを除外
+    postsQuery = postsQuery.filter('comments.user_id', 'not.in', `(${blockedUserIdsArray.join(',')})`);
+  }
+
+  const { data: postsData, error: postsError } = await postsQuery;
 
   if (postsError) {
-    console.error('Error fetching posts:', postsError);
+    console.error('投稿データの取得エラー:', postsError);
   }
 
-  const { data: commentsData, error: commentsError } = await supabase
-    .from('comments')
-    .select('*, profiles!inner(username, avatar_url), parent_post:post_id(user_id, profiles(username, avatar_url))')
-    .order('created_at', { ascending: false });
-
-  if (commentsError) {
-    console.error('Error fetching comments:', commentsError);
-  }
-
-  const posts: TimelineItem[] = (postsData || []).map(p => ({ ...p, item_type: 'post' }));
-  const comments: TimelineItem[] = (commentsData || []).map(c => ({ ...c, item_type: 'comment' } as Comment & { item_type: 'comment' }));
-
-  const initialItems = [...posts, ...comments]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const posts: TimelineItem[] = (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' }));
+  const initialItems = posts;
 
   return {
     props: {

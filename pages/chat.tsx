@@ -23,13 +23,15 @@ type ChatRoom = {
   id: string;
   other_user: Profile;
   last_message: LastMessage | null;
+  unread_count: number;
 };
 
 type ChatPageProps = {
   chatRooms: ChatRoom[];
+  error?: string;
 };
 
-const ChatPage: NextPage<ChatPageProps> = ({ chatRooms }) => {
+const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
   const user = useUser();
 
   if (!user) return null;
@@ -40,6 +42,14 @@ const ChatPage: NextPage<ChatPageProps> = ({ chatRooms }) => {
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">トーク</h1>
+
+          {/* エラー表示 */}
+          {error && (
+            <div className="bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-lg mb-6">
+              <p className="font-bold">データ取得エラー</p>
+              <p className="text-sm mt-1">{error}</p>
+            </div>
+          )}
 
           {chatRooms.length > 0 ? (
             <div className="space-y-2">
@@ -59,9 +69,16 @@ const ChatPage: NextPage<ChatPageProps> = ({ chatRooms }) => {
                         </p>
                       )}
                     </div>
-                    <p className="text-sm text-gray-400 truncate">
-                      {room.last_message?.content || 'まだメッセージはありません'}
-                    </p>
+                    <div className="flex justify-between items-center mt-0.5">
+                      <p className="text-sm text-gray-400 truncate pr-2">
+                        {room.last_message?.content || 'まだメッセージはありません'}
+                      </p>
+                      {room.unread_count > 0 && (
+                        <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-pink-600 text-xs font-bold text-white">
+                          {room.unread_count}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -89,31 +106,44 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: rooms, error } = await supabase
-    .from('chat_rooms')
-    .select('id, user1:profiles!user1_id(*), user2:profiles!user2_id(*), messages(content, created_at)')
-    .or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`)
-    .order('created_at', { foreignTable: 'messages', ascending: false });
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      if (block.blocker_id === session.user.id) {
+        blockedUserIds.add(block.blocked_id);
+      }
+      if (block.blocked_id === session.user.id) {
+        blockedUserIds.add(block.blocker_id);
+      }
+    }
+  }
+
+  // 2. チャットルームを取得
+  let { data, error } = await supabase.rpc('get_chat_rooms_with_details', {
+    p_user_id: session.user.id,
+  });
 
   if (error) {
     console.error('Error fetching chat rooms:', error);
-    return { props: { chatRooms: [] } };
+    return { props: { chatRooms: [], error: error.message } };
   }
 
-  const chatRooms = rooms.map(room => {
-    // Supabase returns related records as an array, so we access the first element.
-    const user1 = Array.isArray(room.user1) ? room.user1[0] : room.user1;
-    const user2 = Array.isArray(room.user2) ? room.user2[0] : room.user2;
-    const otherUser = user1.id === session.user.id ? user2 : user1;
-    // messages are already sorted by created_at desc, so the first one is the latest.
-    const lastMessage = room.messages.length > 0 ? room.messages[0] : null;
+  // 3. ブロックしたユーザーのチャットルームを除外
+  let chatRooms: ChatRoom[] = data.map((room: ChatRoom) => ({
+    id: room.id,
+    other_user: room.other_user,
+    last_message: room.last_message,
+    unread_count: room.unread_count,
+  }));
 
-    return {
-      id: room.id,
-      other_user: otherUser,
-      last_message: lastMessage,
-    };
-  });
+  if (blockedUserIds.size > 0) {
+    chatRooms = chatRooms.filter((room: ChatRoom) => !blockedUserIds.has(room.other_user.id));
+  }
 
   return {
     props: {

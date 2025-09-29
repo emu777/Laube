@@ -154,33 +154,63 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     .select('username')
     .eq('id', session.user.id)
     .maybeSingle();
-
-  // 自分にいいねしたユーザーを取得
-  const { data: likedByUsers, error: likedByError } = await supabase
+  
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData, error: blocksError } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
+  if (blocksError) {
+    console.error('ブロック情報の取得エラー:', blocksError);
+  }
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      // 自分からブロックした相手のIDを追加
+      if (block.blocker_id === session.user.id) {
+        blockedUserIds.add(block.blocked_id);
+      }
+      // 自分をブロックした相手のIDを追加
+      if (block.blocked_id === session.user.id) {
+        blockedUserIds.add(block.blocker_id);
+      }
+    }
+  }
+  
+  // 2. ログインユーザーがいいねした相手のIDリストを取得
+  const { data: myLikes } = await supabase
+    .from('likes')
+    .select('liked_id')
+    .eq('liker_id', session.user.id);
+  const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
+  
+  // 3. 「あなたに片思い中のユーザー」を取得 (ブロック関係と、自分がいいねしたユーザーは除外)
+  let likedByQuery = supabase
     .from('likes')
     .select('created_at, liker:liker_id(id, username, avatar_url)')
-    .eq('liked_id', session.user.id)
+    .eq('liked_id', session.user.id);
+  const excludeFromLikedBy = Array.from(new Set([...myLikedUserIds, ...Array.from(blockedUserIds)]));
+  if (excludeFromLikedBy.length > 0) {
+    likedByQuery = likedByQuery.not('liker_id', 'in', `(${excludeFromLikedBy.join(',')})`);
+  }
+  const { data: likedByUsers, error: likedByError } = await likedByQuery
     .order('created_at', { ascending: false });
-
-  // --- デバッグ用コード ---
-  console.log('Liked By Users Data:', likedByUsers);
-  // --------------------
-
-  const { data: profiles, error } = await supabase
+  
+  // 4. メインのユーザー一覧を取得 (ブロック関係のユーザーは除外)
+  let profilesQuery = supabase
     .from('profiles')
     .select('id, username, avatar_url, location, age, last_seen')
-    // 自分自身を除外する
-    .not('id', 'eq', session.user.id)
-    // ユーザー名が設定されているユーザーのみ取得
-    .not('username', 'is', null)
-    // last_seenが新しい順に並び替え、nullは最後にする
-    .order('last_seen', { ascending: false, nullsFirst: false });
-
+    .neq('id', session.user.id)
+    .not('username', 'is', null);
+  if (blockedUserIds.size > 0) {
+    profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+  }
+  const { data: profiles, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
   if (error) {
-    console.error('Error fetching profiles:', error);
+    console.error('プロフィール一覧の取得エラー:', error);
   }
   if (likedByError) {
-    console.error('Error fetching liked by users:', likedByError);
+    console.error('「片思い中」ユーザーの取得エラー:', likedByError);
   }
 
   return {

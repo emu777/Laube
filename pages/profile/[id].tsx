@@ -39,6 +39,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
   const router = useRouter()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isLiked, setIsLiked] = useState(initialIsLiked)
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
 
   useEffect(() => {
     if (profile?.avatar_url) {
@@ -58,15 +59,15 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
       .from('chat_rooms')
       .insert({ user1_id: user1, user2_id: user2 })
       .select()
-      .single();
+      .single()
+      .then(({ data: roomData, error: roomError }) => {
+        if (roomError && roomError.code !== '23505') throw roomError;
+        // If the room already exists, find it
+        return roomData || supabase.from('chat_rooms').select('id').eq('user1_id', user1).eq('user2_id', user2).single().then(res => res.data);
+      });
 
-    if (error && error.code !== '23505') { // 23505 is unique_violation
-      console.error('Error creating chat room:', error);
-      alert('チャットルームの作成に失敗しました。');
-    } else {
-      alert('マッチング成功！メッセージを送ってみましょう。');
-      // TODO: 将来的にチャットページへ遷移させる
-      // router.push(`/chat/${data.id}`);
+    if (data?.id) {
+      router.push(`/chat/${data.id}`);
     }
   };
 
@@ -104,17 +105,41 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     await createChatRoom();
   };
 
-  const handleReject = async () => {
+  const executeReject = async () => {
     if (!user || !profile || isMyProfile) return;
-    // 相手からのいいねを削除する
-    const { error } = await supabase.from('likes').delete().match({ liker_id: profile.id, liked_id: user.id });
-    if (error) {
-      console.error('Error rejecting like:', error);
-    } else {
-      alert('いいねを拒否しました。');
-      // UIからボタンを消すために状態を更新（ページをリロードさせても良い）
-      window.location.reload(); // 簡単な実装としてリロード
+
+    // 1. 相手からのいいねを削除
+    const { error: deleteLikeError } = await supabase.from('likes').delete().match({ liker_id: profile.id, liked_id: user.id });
+    if (deleteLikeError) {
+      console.error('Error rejecting like:', deleteLikeError);
+      alert('処理に失敗しました。');
+      return;
     }
+
+    // 3. 既存のチャットルームがあれば削除
+    const user1 = user.id < profile.id ? user.id : profile.id;
+    const user2 = user.id > profile.id ? user.id : profile.id;
+    const { error: deleteRoomError } = await supabase
+      .from('chat_rooms')
+      .delete()
+      .eq('user1_id', user1)
+      .eq('user2_id', user2);
+    if (deleteRoomError) {
+      console.error('Error deleting chat room:', deleteRoomError);
+    }
+
+    // 2. 相互ブロックのデータを作成
+    const { error: blockError } = await supabase.rpc('create_mutual_block', {
+      p_blocker_id: user.id,
+      p_blocked_id: profile.id,
+    });
+    if (blockError) {
+      console.error('Error creating block:', blockError);
+      // いいね削除は成功しているので、エラーが出ても続行する
+    }
+
+    alert('相手をブロックしました。');
+    router.push('/');
   };
 
   if (!profile) {
@@ -150,6 +175,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
                   alt="avatar"
                   className="w-full h-full object-cover"
                   fill
+                  sizes="(max-width: 640px) 100vw, 448px"
                   priority
                 />
                 ) : (
@@ -279,7 +305,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
               <button onClick={handleMatch} className="w-full p-3 bg-gradient-to-r from-pink-500 to-orange-400 text-white font-bold rounded-lg hover:opacity-90 transition-opacity">
                 両想いになる
               </button>
-              <button onClick={handleReject} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+              <button onClick={() => setShowRejectConfirm(true)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
                 拒否する
               </button>
             </div>
@@ -287,6 +313,23 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
 
         </div>
       </main>
+
+      {/* 拒否確認モーダル */}
+      {showRejectConfirm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
+            <h2 className="text-lg font-bold text-white">確認</h2>
+            <p className="text-sm text-gray-300">
+              今後このユーザーとは繋がれなくなります。本当によろしいですか？
+            </p>
+            <div className="flex gap-4 pt-2">
+              <button onClick={() => setShowRejectConfirm(false)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">もう少し考える</button>
+              <button onClick={executeReject} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">はい</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   )

@@ -44,10 +44,24 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     scrollToBottom();
   }, [messages]);
 
+  // このルームに入室したときに、既読情報を更新する
+  useEffect(() => {
+    if (user && roomId) {
+      const markAsRead = async () => {
+        await supabase.from('read_receipts').upsert({
+          room_id: roomId,
+          user_id: user.id,
+          last_read_at: new Date().toISOString(),
+        });
+      };
+      markAsRead();
+    }
+  }, [user, roomId, supabase]);
+
   useEffect(() => {
     const channel = supabase
-      // チャンネル名が一意になるようにランダムな文字列を追加
-      .channel(`chat-room-${roomId}-${Math.random()}`)
+      // このルーム専用の一意で固定のチャンネル名を指定
+      .channel(`chat-room:${roomId}`)
       .on(
         'postgres_changes',
         {
@@ -56,26 +70,27 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
           table: 'messages',
           filter: `room_id=eq.${roomId}`,
         },
-        async (payload) => {
-          const newMessagePayload = payload.new as Omit<Message, 'sender'>;
-          // メッセージ送信者の情報を取得
-          const { data: senderProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', newMessagePayload.sender_id)
-            .single();
+        (payload) => {
+          const newMessage = payload.new as Omit<Message, 'sender'>;
+          const senderProfile = newMessage.sender_id === user?.id
+            ? { id: user.id, username: user.user_metadata.username, avatar_url: user.user_metadata.avatar_url }
+            : otherUser;
 
           if (senderProfile) {
-            setMessages((currentMessages) => [...currentMessages, { ...newMessagePayload, sender: senderProfile }]);
+            setMessages((currentMessages) => [...currentMessages, { ...newMessage, sender: senderProfile as Profile }]);
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime channel error:', err);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId]);
+  }, [supabase, roomId, user, otherUser]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +129,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
           const isMe = message.sender_id === user?.id;
           return (
             <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-              {!isMe && <AvatarIcon avatarUrlPath={message.sender.avatar_url} size={28} />}
+              {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={28} />}
               <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${isMe ? 'bg-pink-600 rounded-br-md' : 'bg-gray-700 rounded-bl-md'}`}>
                 <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
               </div>
@@ -131,7 +146,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="メッセージを入力..."
-            className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-full focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors text-sm px-4"
+            className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-full focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors text-base px-4"
           />
           <button
             type="submit"
@@ -176,7 +191,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   // メッセージを取得
   const { data: messages, error: messagesError } = await supabase
     .from('messages')
-    .select('*, sender:profiles!sender_id(*)')
+    .select('*, sender:sender_id(id, username, avatar_url)')
     .eq('room_id', roomId)
     .order('created_at', { ascending: true });
 

@@ -75,7 +75,7 @@ export default function Account({ profile }: AccountPageProps) {
     mbti,
   }: Partial<Profile>,
   alertMessage: string = 'プロフを更新しました。') {
-    try {
+    try { // The 'arguments' object is special and cannot be modified.
       setLoading(true)
       if (!user) throw new Error('No user')
 
@@ -102,7 +102,7 @@ export default function Account({ profile }: AccountPageProps) {
       if (error) throw error
       alert(alertMessage)
     } catch (error) {
-      if (error instanceof Error) {
+      if (error instanceof Error) { // The 'arguments' object is special and cannot be modified.
         alert('Error updating the data!')
         console.log(error)
       }
