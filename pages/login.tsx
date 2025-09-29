@@ -1,6 +1,6 @@
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { useSession, useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { NextPage, GetServerSidePropsContext } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/router';

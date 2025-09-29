@@ -238,9 +238,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   if (blockedUserIds.size > 0) {
     recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
   }
-  const { data: recommendations, error: _error } = await recommendationsQuery;
-  if (_error) {
-    console.error('Error fetching recommendations:', _error);
+  const { data: recommendations, error } = await recommendationsQuery;
+  if (error) {
+    console.error('Error fetching recommendations:', error);
   }
 
   return {

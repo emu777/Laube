@@ -55,7 +55,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     const user1 = user.id < profile.id ? user.id : profile.id;
     const user2 = user.id > profile.id ? user.id : profile.id;
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('chat_rooms')
       .insert({ user1_id: user1, user2_id: user2 })
       .select()

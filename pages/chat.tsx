@@ -124,7 +124,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   // 2. チャットルームを取得
-  let { data, error } = await supabase.rpc('get_chat_rooms_with_details', {
+  const { data, error } = await supabase.rpc('get_chat_rooms_with_details', {
     p_user_id: session.user.id,
   });
 
