@@ -31,10 +31,9 @@ type ProfilePageProps = {
   isLiked: boolean
   isLikedBy: boolean
   isMyProfile: boolean
-  unreadNotificationCount: number
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile, unreadNotificationCount }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile }) => {
   const supabase = useSupabaseClient()
   const user = useUser()
   const router = useRouter()
@@ -90,16 +89,16 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
         console.error('Error liking profile:', error)
       } else {
         setIsLiked(true)
-        if (isLikedBy) {
-          // 相手も自分をいいねしていたらマッチング成立
+        // 「いいね」された相手に通知を送る
+        await supabase.from('notifications').insert({
+          recipient_id: profile.id,
+          sender_id: user.id,
+          type: 'like',
+          reference_id: user.id,
+        });
+
+        if (isLikedBy) { // 相手も自分をいいねしていたらマッチング成立
           await createChatRoom();
-          // マッチング通知
-          await supabase.from('notifications').insert({
-            recipient_id: profile.id,
-            sender_id: user.id,
-            type: 'like',
-            reference_id: user.id,
-          });
         }
       }
     }
@@ -338,7 +337,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
         </div>
       )}
 
-      <BottomNav unreadNotificationCount={unreadNotificationCount} />
+      <BottomNav />
     </div>
   )
 }
@@ -386,16 +385,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     isLikedBy = (likedByCount ?? 0) > 0;
   }
 
-  // 未読通知数を取得
-  const { count: unreadNotificationCount, error: unreadError } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_id', session.user.id)
-    .eq('is_read', false);
-
-  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
-
   return {
-    props: { profile, isLiked, isLikedBy, isMyProfile, unreadNotificationCount: unreadNotificationCount || 0 },
+    props: { profile, isLiked, isLikedBy, isMyProfile },
   }
 }

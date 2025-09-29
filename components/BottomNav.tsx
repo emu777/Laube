@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FaBell } from 'react-icons/fa';
 import { FaUser, FaComments, FaRegCompass, FaFilm } from 'react-icons/fa';
+import { useNotifications } from '../contexts/NotificationContext';
 
 // 各アイコンの定義
 const UsersIcon = ({ className }: { className?: string }) => (
@@ -32,8 +33,9 @@ const TalkIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const BottomNav = ({ unreadNotificationCount = 0 }: { unreadNotificationCount?: number }) => {
+const BottomNav = () => {
   const router = useRouter();
+  const { unreadCount: unreadNotificationCount } = useNotifications();
 
   const navItems = [
     { href: '/', label: '出会い', icon: UsersIcon },
@@ -44,7 +46,7 @@ const BottomNav = ({ unreadNotificationCount = 0 }: { unreadNotificationCount?: 
   ];
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-full shadow-lg flex items-center px-2">
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-full shadow-lg flex items-center px-2 sm:px-4">
       {navItems.map(({ href, label, icon: Icon, showBadge }) => {
         const isActive = router.pathname === href;
         return (

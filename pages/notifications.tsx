@@ -118,7 +118,7 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications, un
           )}
         </div>
       </main>
-      <BottomNav unreadNotificationCount={unreadNotificationCount} />
+      <BottomNav />
     </div>
   );
 };
@@ -141,14 +141,5 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   if (error) console.error('Error fetching notifications:', error);
 
-  // 未読通知数を取得
-  const { count: unreadNotificationCount, error: unreadError } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_id', session.user.id)
-    .eq('is_read', false);
-
-  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
-
-  return { props: { notifications: notifications || [], unreadNotificationCount: unreadNotificationCount || 0 } };
+  return { props: { notifications: notifications || [] } };
 };

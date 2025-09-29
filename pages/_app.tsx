@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { GeistSans } from 'geist/font/sans'
 import PageLoader from '@/components/PageLoader'
+import { NotificationProvider } from '../contexts/NotificationContext';
 import '@/styles/globals.css'
 
 export default function MyApp({
@@ -55,8 +56,10 @@ export default function MyApp({
         supabaseClient={supabaseClient}
         initialSession={pageProps.initialSession}
       >
-        {loading && <PageLoader />}
-        <Component {...pageProps} />
+        <NotificationProvider>
+          {loading && <PageLoader />}
+          <Component {...pageProps} />
+        </NotificationProvider>
       </SessionContextProvider>
     </>
   )

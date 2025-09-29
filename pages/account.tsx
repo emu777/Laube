@@ -27,10 +27,9 @@ type Profile = {
 
 type AccountPageProps = {
   profile: Profile;
-  unreadNotificationCount: number;
 };
 
-export default function Account({ profile, unreadNotificationCount }: AccountPageProps) {
+export default function Account({ profile }: AccountPageProps) {
   const supabase = useSupabaseClient()
   const user = useUser()
   const [loading, setLoading] = useState(true)
@@ -202,7 +201,7 @@ export default function Account({ profile, unreadNotificationCount }: AccountPag
     <div className="bg-gray-900 min-h-screen text-white">
       <Header />
       <main className="p-4 pt-24 pb-24">
-        <div className="w-full max-w-2xl mx-auto space-y-8">
+        <div className="w-full max-w-2xl mx-auto space-y-8 standalone:max-w-none standalone:mx-0">
           <h1 className="text-center w-full text-2xl font-bold">マイプロフィール</h1>
 
           <div className="flex justify-center">
@@ -368,7 +367,7 @@ export default function Account({ profile, unreadNotificationCount }: AccountPag
           </form>
         </div>
       </main>
-      <BottomNav unreadNotificationCount={unreadNotificationCount} />
+      <BottomNav />
       </div>
   )
 }
@@ -397,20 +396,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     console.error('Error fetching profile on server', error);
   }
 
-  // 未読通知数を取得
-  const { count: unreadNotificationCount, error: unreadError } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_id', session.user.id)
-    .eq('is_read', false);
-
-  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
-
   return {
     props: {
       initialSession: session,
       profile: profileData || {},
-      unreadNotificationCount: unreadNotificationCount || 0,
     },
   }
 }

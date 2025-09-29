@@ -1,8 +1,10 @@
 import { GetServerSidePropsContext, NextPage } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
-import { useState, useEffect } from 'react';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import useSWR from 'swr';
 import Header from '@/components/Header'
 import ProfileCard from '@/components/ProfileCard'
 import BottomNav from '@/components/BottomNav'
@@ -28,13 +30,10 @@ type LikedByUser = {
 };
 
 type HomePageProps = {
-  profiles: Profile[];
-  likedByUsers: LikedByUser[];
   isNewUser: boolean;
-  unreadNotificationCount: number;
 }
 
-const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unreadNotificationCount }) => {
+const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   const router = useRouter();
 
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
@@ -46,6 +45,85 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unre
   }, [isNewUser, router]);
 
   const [showAllLikedBy, setShowAllLikedBy] = useState(false);
+  const supabase = useSupabaseClient();
+
+  // プロフィール一覧を取得するfetcher
+  const profilesFetcher = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) throw new Error('Not authenticated');
+    const userId = sessionData.session.user.id;
+
+    const { data: blocksData } = await supabase
+      .from('blocks')
+      .select('blocker_id,blocked_id')
+      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+    const blockedUserIds = new Set<string>();
+    if (blocksData) {
+      for (const block of blocksData) {
+        if (block.blocker_id === userId) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === userId) blockedUserIds.add(block.blocker_id);
+      }
+    }
+
+    let profilesQuery = supabase
+      .from('profiles')
+      .select('id, username, avatar_url, location, age, last_seen')
+      .neq('id', userId)
+      .not('username', 'is', null);
+    if (blockedUserIds.size > 0) {
+      profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+    }
+    const { data, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data;
+  };
+
+  // 片思いユーザーを取得するfetcher
+  const likedByUsersFetcher = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) throw new Error('Not authenticated');
+    const userId = sessionData.session.user.id;
+
+    // 1. ブロック関係のユーザーIDを取得
+    const { data: blocksData } = await supabase
+      .from('blocks')
+      .select('blocker_id,blocked_id')
+      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+    const blockedUserIds = new Set<string>();
+    if (blocksData) {
+      for (const block of blocksData) {
+        if (block.blocker_id === userId) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === userId) blockedUserIds.add(block.blocker_id);
+      }
+    }
+
+    // 2. 自分が「いいね」したユーザーIDを取得
+    const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', userId);
+    const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
+
+    // 3. 除外するユーザーIDのリストを作成
+    const excludeFromLikedBy = Array.from(new Set([...myLikedUserIds, ...Array.from(blockedUserIds)]));
+
+    // 4. 自分を「いいね」したユーザーのIDと「いいね」した日時を取得
+    let likedByQuery = supabase.from('likes').select('created_at, liker_id').eq('liked_id', userId);
+    if (excludeFromLikedBy.length > 0) {
+      likedByQuery = likedByQuery.not('liker_id', 'in', `(${excludeFromLikedBy.join(',')})`);
+    }
+    const { data: likesData, error: likesError } = await likedByQuery.order('created_at', { ascending: false });
+    if (likesError) throw likesError;
+    if (!likesData) return [];
+
+    // 5. 取得したIDを元に、ユーザーのプロフィール情報を取得
+    const likerIds = likesData.map(like => like.liker_id);
+    const { data: profilesData, error: profilesError } = await supabase.from('profiles').select('id, username, avatar_url').in('id', likerIds);
+    if (profilesError) throw profilesError;
+
+    // 6. 「いいね」情報とプロフィール情報を結合して返す
+    return likesData.map(like => ({
+      created_at: like.created_at,
+      liker: profilesData.find(p => p.id === like.liker_id) || null,
+    }));
+  };
 
   const handleCloseModalAndRedirect = () => {
     setShowAddToHomeScreenModal(false);
@@ -53,13 +131,16 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unre
     router.push('/account');
   };
 
+  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>('profiles', profilesFetcher);
+  const { data: likedByUsers, isLoading: isLoadingLikedBy } = useSWR<LikedByUser[]>('likedByUsers', likedByUsersFetcher);
+
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-4xl mx-auto space-y-8">
           {/* あなたを気になっている人 */}
-          {likedByUsers.length > 0 ? (
+          {likedByUsers && likedByUsers.length > 0 ? (
             <div className="bg-gray-800/50 border border-gray-700/80 rounded-xl p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 overflow-hidden">
@@ -93,12 +174,15 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unre
               )}
             </div>
           ) : null}
-
-          <div className="flex flex-wrap justify-center gap-[15px]">
-            {profiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} />
-            ))}
-          </div>
+          {isLoadingProfiles ? (
+            <div className="text-center py-10">
+              <p>ユーザーを探しています...</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-[15px]">
+              {profiles?.map((profile) => <ProfileCard key={profile.id} profile={profile} />)}
+            </div>
+          )}
         </div>
       </main>
 
@@ -127,7 +211,7 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unre
         </div>
       )}
 
-      <BottomNav unreadNotificationCount={unreadNotificationCount} />
+      <BottomNav />
     </div>
   )
 }
@@ -135,100 +219,23 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unre
 export default Home
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx)
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const supabase = createPagesServerClient(ctx);
+  const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
-    return {
-      redirect: {
-        destination: '/login',
-        permanent: false,
-      },
-    }
+    return { redirect: { destination: '/login', permanent: false } };
   }
 
   // ログインユーザーのプロフィールを取得して新規ユーザーか判定
-  const { data: userProfile } = await supabase
+  const { data: userProfile, error } = await supabase
     .from('profiles')
     .select('username')
     .eq('id', session.user.id)
     .maybeSingle();
-  
-  // 1. ブロック関係にあるユーザーIDのリストを取得
-  const { data: blocksData, error: blocksError } = await supabase
-    .from('blocks')
-    .select('blocker_id,blocked_id')
-    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
-  if (blocksError) {
-    console.error('ブロック情報の取得エラー:', blocksError);
-  }
-  const blockedUserIds = new Set<string>();
-  if (blocksData) {
-    for (const block of blocksData) {
-      // 自分からブロックした相手のIDを追加
-      if (block.blocker_id === session.user.id) {
-        blockedUserIds.add(block.blocked_id);
-      }
-      // 自分をブロックした相手のIDを追加
-      if (block.blocked_id === session.user.id) {
-        blockedUserIds.add(block.blocker_id);
-      }
-    }
-  }
-  
-  // 2. ログインユーザーがいいねした相手のIDリストを取得
-  const { data: myLikes } = await supabase
-    .from('likes')
-    .select('liked_id')
-    .eq('liker_id', session.user.id);
-  const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
-  
-  // 3. 「あなたに片思い中のユーザー」を取得 (ブロック関係と、自分がいいねしたユーザーは除外)
-  let likedByQuery = supabase
-    .from('likes')
-    .select('created_at, liker:liker_id(id, username, avatar_url)')
-    .eq('liked_id', session.user.id);
-  const excludeFromLikedBy = Array.from(new Set([...myLikedUserIds, ...Array.from(blockedUserIds)]));
-  if (excludeFromLikedBy.length > 0) {
-    likedByQuery = likedByQuery.not('liker_id', 'in', `(${excludeFromLikedBy.join(',')})`);
-  }
-  const { data: likedByUsers, error: likedByError } = await likedByQuery
-    .order('created_at', { ascending: false });
-  
-  // 4. メインのユーザー一覧を取得 (ブロック関係のユーザーは除外)
-  let profilesQuery = supabase
-    .from('profiles')
-    .select('id, username, avatar_url, location, age, last_seen')
-    .neq('id', session.user.id)
-    .not('username', 'is', null);
-  if (blockedUserIds.size > 0) {
-    profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
-  }
-  const { data: profiles, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
-  if (error) {
-    console.error('プロフィール一覧の取得エラー:', error);
-  }
-  if (likedByError) {
-    console.error('「片思い中」ユーザーの取得エラー:', likedByError);
-  }
-
-  // 未読通知数を取得
-  const { count: unreadNotificationCount, error: unreadError } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_id', session.user.id)
-    .eq('is_read', false);
-
-  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
 
   return {
     props: {
-      profiles: profiles || [],
-      likedByUsers: likedByUsers || [],
       isNewUser: !userProfile?.username,
-      unreadNotificationCount: unreadNotificationCount || 0,
     },
   }
 }
