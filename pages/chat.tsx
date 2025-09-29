@@ -29,9 +29,10 @@ type ChatRoom = {
 type ChatPageProps = {
   chatRooms: ChatRoom[];
   error?: string;
+  unreadNotificationCount: number;
 };
 
-const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
+const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error, unreadNotificationCount }) => {
   const user = useUser();
 
   if (!user) return null;
@@ -91,7 +92,7 @@ const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
           )}
         </div>
       </main>
-      <BottomNav />
+      <BottomNav unreadNotificationCount={unreadNotificationCount} />
     </div>
   );
 };
@@ -145,9 +146,19 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     chatRooms = chatRooms.filter((room: ChatRoom) => !blockedUserIds.has(room.other_user.id));
   }
 
+  // 未読通知数を取得
+  const { count: unreadNotificationCount, error: unreadError } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', session.user.id)
+    .eq('is_read', false);
+
+  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
+
   return {
     props: {
       chatRooms,
+      unreadNotificationCount: unreadNotificationCount || 0,
     },
   };
 };

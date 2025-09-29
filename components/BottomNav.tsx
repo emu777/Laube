@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { FaBell } from 'react-icons/fa';
+import { FaUser, FaComments, FaRegCompass, FaFilm } from 'react-icons/fa';
 
 // 各アイコンの定義
 const UsersIcon = ({ className }: { className?: string }) => (
@@ -30,7 +32,7 @@ const TalkIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const BottomNav = () => {
+const BottomNav = ({ unreadNotificationCount = 0 }: { unreadNotificationCount?: number }) => {
   const router = useRouter();
 
   const navItems = [
@@ -38,21 +40,27 @@ const BottomNav = () => {
     { href: '/timeline', label: 'タイムライン', icon: TimelineIcon },
     { href: '/recommendations', label: 'オススメ', icon: StarIcon },
     { href: '/chat', label: 'トーク', icon: TalkIcon },
+    { href: '/notifications', label: '通知', icon: FaBell, showBadge: true },
   ];
 
   return (
     <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-full shadow-lg flex items-center px-2">
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {navItems.map(({ href, label, icon: Icon, showBadge }) => {
         const isActive = router.pathname === href;
         return (
           <Link
             key={href}
             href={href}
-              className={`flex flex-col items-center justify-center no-underline w-20 py-1.5 text-xs rounded-full transition-all duration-200 ${
+              className={`relative flex flex-col items-center justify-center no-underline w-20 py-1.5 text-xs rounded-full transition-all duration-200 ${
                 isActive ? 'bg-gray-700/80 text-white scale-110' : 'text-gray-400 hover:text-white'
             }`}
           >
             <Icon className="w-[30px] h-[30px] mb-0.5" />
+            {showBadge && unreadNotificationCount > 0 && (
+              <span className="absolute top-0 right-2.5 -mt-1 bg-red-500 text-white text-xs font-bold rounded-full px-1 min-w-[18px] text-center">
+                {unreadNotificationCount}
+              </span>
+            )}
             <span>{label}</span>
           </Link>
         );

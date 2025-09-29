@@ -3,10 +3,11 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { useRouter } from 'next/router';
 import Header from '@/components/Header'
 import { FaRegComment } from 'react-icons/fa';
 import BottomNav from '@/components/BottomNav'
+import AvatarIcon from '@/components/AvatarIcon';
 
 type Comment = {
   id: string;
@@ -40,40 +41,36 @@ type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'co
 
 type TimelinePageProps = {
   initialItems: TimelineItem[];
+  unreadNotificationCount: number;
 };
 
-const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
+const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems, unreadNotificationCount }) => {
   const supabase = useSupabaseClient();
   const user = useUser();
+  const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [newCommentContent, setNewCommentContent] = useState('');
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
 
+  // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {
-    const fetchAvatars = async () => {
-      const urls: Record<string, string | null> = {};
-      const avatarPaths = new Set<string>();
-
-      items.forEach(item => {
-        if (item.profiles?.avatar_url) avatarPaths.add(item.profiles.avatar_url);
-        if (item.item_type === 'comment' && Array.isArray(item.parent_post?.profiles) && item.parent_post?.profiles[0]?.avatar_url) {
-          avatarPaths.add(item.parent_post.profiles[0].avatar_url);
-        }
-      });
-
-      for (const path of Array.from(avatarPaths)) {
-        if (path && !urls[path]) {
-          const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-          urls[path] = data.publicUrl;
-        }
+    const hash = router.asPath.split('#')[1];
+    if (hash) {
+      const postExists = items.some(item => item.item_type === 'post' && item.id === hash);
+      if (postExists) {
+        setCommentingPostId(hash);
+        // レンダリング後にスクロール
+        setTimeout(() => {
+          const element = document.getElementById(hash);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
       }
-      setAvatarUrls(urls);
-    };
-    fetchAvatars();
-  }, [items, supabase]);
+    }
+  }, [router.asPath, items]);
 
   // リアルタイムで新しい投稿を購読する
   useEffect(() => {
@@ -172,6 +169,23 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
       console.error('Error creating comment:', error);
       alert('コメントの投稿に失敗しました。');
     } else {
+      // 自分の投稿へのコメントでない場合は通知を送る
+      const { data: post } = await supabase
+        .from('posts')
+        .select('user_id, content')
+        .eq('id', postId)
+        .single();
+
+      if (post && post.user_id !== user.id) {
+        await supabase.from('notifications').insert({
+          recipient_id: post.user_id,
+          sender_id: user.id,
+          type: 'comment',
+          reference_id: postId, // 投稿ID
+          content_preview: post.content.substring(0, 50), // 投稿内容のプレビュー
+        });
+      }
+
       setNewCommentContent('');
       setCommentingPostId(null);
     }
@@ -207,9 +221,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                     <div className="flex space-x-4">
                       <Link href={`/profile/${item.user_id}`} className="flex-shrink-0 cursor-pointer">
                         <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
-                          {item.profiles?.avatar_url && avatarUrls[item.profiles.avatar_url] && (
-                            <Image src={avatarUrls[item.profiles.avatar_url]!} alt="avatar" className="object-cover" fill />
-                          )}
+                          <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={30} />
                         </div>
                       </Link>
                       <div className="flex-1">
@@ -233,20 +245,11 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
               // 通常の投稿
               const post = item;
               return (
-                <div key={post.id}>
+                <div key={post.id} id={post.id}>
                   <div className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
                     <div className="flex space-x-4">
                       <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
-                        <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
-                          {post.profiles?.avatar_url && avatarUrls[post.profiles.avatar_url] && (
-                            <Image
-                              src={avatarUrls[post.profiles.avatar_url]!}
-                              alt="avatar"
-                              className="object-cover"
-                              fill
-                            />
-                          )}
-                        </div>
+                        <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={30} />
                       </Link>
                       <div className="flex-1 flex flex-col">
                         <div className="flex-1">
@@ -286,11 +289,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                         {post.comments.map(comment => (
                           <div key={comment.id} className="flex items-start space-x-3">
                             <Link href={`/profile/${comment.user_id}`} className="flex-shrink-0">
-                              <div className="relative w-7 h-7 rounded-full bg-gray-600 overflow-hidden">
-                                {comment.profiles?.avatar_url && avatarUrls[comment.profiles.avatar_url] && (
-                                  <Image src={avatarUrls[comment.profiles.avatar_url]!} alt="avatar" fill className="object-cover" />
-                                )}
-                              </div>
+                              <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={28}/>
                             </Link>
                             <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">
                               <p className="text-sm font-bold">{comment.profiles?.username || '匿名さん'}</p>
@@ -356,7 +355,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
       </button>
 
-      <BottomNav />
+      <BottomNav unreadNotificationCount={unreadNotificationCount} />
     </div>
   );
 };
@@ -411,9 +410,19 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const posts: TimelineItem[] = (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' }));
   const initialItems = posts;
 
+  // 未読通知数を取得
+  const { count: unreadNotificationCount, error: unreadError } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', session.user.id)
+    .eq('is_read', false);
+
+  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
+
   return {
     props: {
       initialItems,
+      unreadNotificationCount: unreadNotificationCount || 0,
     },
   };
 };

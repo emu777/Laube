@@ -23,6 +23,7 @@ type Recommendation = {
 
 type RecommendationsPageProps = {
   initialRecommendations: Recommendation[];
+  unreadNotificationCount: number;
 };
 
 const getYouTubeVideoId = (url: string): string | null => {
@@ -40,7 +41,7 @@ const getYouTubeVideoId = (url: string): string | null => {
   }
 };
 
-const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecommendations }) => {
+const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecommendations, unreadNotificationCount }) => {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
@@ -198,7 +199,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
       </button>
 
-      <BottomNav />
+      <BottomNav unreadNotificationCount={unreadNotificationCount} />
     </div>
   );
 };
@@ -243,9 +244,19 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     console.error('Error fetching recommendations:', error);
   }
 
+  // 未読通知数を取得
+  const { count: unreadNotificationCount, error: unreadError } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', session.user.id)
+    .eq('is_read', false);
+
+  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
+
   return {
     props: {
       initialRecommendations: recommendations || [],
+      unreadNotificationCount: unreadNotificationCount || 0,
     },
   };
 };

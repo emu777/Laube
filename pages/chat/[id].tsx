@@ -94,7 +94,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim() || !user || !otherUser) return;
 
     const { error } = await supabase
       .from('messages')
@@ -106,6 +106,15 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     } else {
       setNewMessage('');
     }
+
+    // 相手に通知を送信
+    await supabase.from('notifications').insert({
+      recipient_id: otherUser.id,
+      sender_id: user.id,
+      type: 'message',
+      reference_id: roomId,
+      content_preview: newMessage.substring(0, 50), // メッセージ内容のプレビュー
+    });
   };
 
   if (!otherUser) {

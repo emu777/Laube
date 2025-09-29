@@ -31,9 +31,10 @@ type HomePageProps = {
   profiles: Profile[];
   likedByUsers: LikedByUser[];
   isNewUser: boolean;
+  unreadNotificationCount: number;
 }
 
-const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser }) => {
+const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser, unreadNotificationCount }) => {
   const router = useRouter();
 
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
@@ -126,7 +127,7 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser }) =>
         </div>
       )}
 
-      <BottomNav />
+      <BottomNav unreadNotificationCount={unreadNotificationCount} />
     </div>
   )
 }
@@ -213,11 +214,21 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     console.error('「片思い中」ユーザーの取得エラー:', likedByError);
   }
 
+  // 未読通知数を取得
+  const { count: unreadNotificationCount, error: unreadError } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', session.user.id)
+    .eq('is_read', false);
+
+  if (unreadError) console.error('Error fetching unread notifications:', unreadError);
+
   return {
     props: {
       profiles: profiles || [],
       likedByUsers: likedByUsers || [],
       isNewUser: !userProfile?.username,
+      unreadNotificationCount: unreadNotificationCount || 0,
     },
   }
 }
