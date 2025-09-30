@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const supabase = useSupabaseClient();
   const router = useRouter();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/login'); // 変更なしですが、これが正しい実装です
+  };
+
+  const openLogoutConfirm = () => {
+    setIsOpen(false); // メインメニューを閉じる
+    setShowLogoutConfirm(true); // 確認モーダルを開く
   };
 
   return (
@@ -51,11 +57,27 @@ const Header = () => {
                 </Link>
               </li>
               <li>
-                <button onClick={handleLogout} className="w-full text-left bg-transparent border-none px-4 py-3 text-red-400 cursor-pointer hover:bg-gray-700 rounded">
+                <button onClick={openLogoutConfirm} className="w-full text-left bg-transparent border-none px-4 py-3 text-red-400 cursor-pointer hover:bg-gray-700 rounded">
                   ログアウト
                 </button>
               </li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ログアウト確認モーダル */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
+            <h2 className="text-lg font-bold text-white">確認</h2>
+            <p className="text-sm text-gray-300">
+              ログアウトしますか？
+            </p>
+            <div className="flex gap-4 pt-2">
+              <button onClick={() => setShowLogoutConfirm(false)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">いいえ</button>
+              <button onClick={handleLogout} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">はい</button>
+            </div>
           </div>
         </div>
       )}

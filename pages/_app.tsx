@@ -1,12 +1,25 @@
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
 import { SessionContextProvider, Session } from '@supabase/auth-helpers-react'
 import { AppProps } from 'next/app'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import { GeistSans } from 'geist/font/sans'
+import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google'
 import PageLoader from '@/components/PageLoader'
 import { NotificationProvider } from '../contexts/NotificationContext';
+import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
 import '@/styles/globals.css'
+
+const notoSansJP = Noto_Sans_JP({
+  weight: ['400', '700'], // 使用するフォントの太さを指定
+  subsets: ['latin'], // サブセットを指定（通常はlatinでOK）
+  display: 'swap',
+});
+
+const mplus1 = M_PLUS_1({
+  weight: '700', // 見出し用に太字を指定
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export default function MyApp({
   Component,
@@ -17,6 +30,11 @@ export default function MyApp({
   const [supabaseClient] = useState(() => createPagesBrowserClient())
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  const handleRefresh = useCallback(() => {
+    router.replace(router.asPath);
+    return Promise.resolve();
+  }, [router]);
 
   useEffect(() => {
     const handleStart = () => setLoading(true)
@@ -49,7 +67,11 @@ export default function MyApp({
     <>
       <style jsx global>{`
         html {
-          font-family: ${GeistSans.style.fontFamily};
+          font-family: ${notoSansJP.style.fontFamily};
+          --font-m-plus-1: ${mplus1.style.fontFamily};
+        }
+        h1, h2, h3, h4, h5, h6 {
+          font-family: var(--font-m-plus-1);
         }
       `}</style>
       <SessionContextProvider
@@ -58,7 +80,9 @@ export default function MyApp({
       >
         <NotificationProvider>
           {loading && <PageLoader />}
-          <Component {...pageProps} />
+          <DynamicPullToRefresh onRefresh={handleRefresh}>
+            <Component {...pageProps} />
+          </DynamicPullToRefresh>
         </NotificationProvider>
       </SessionContextProvider>
     </>

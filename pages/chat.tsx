@@ -1,10 +1,11 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useUser } from '@supabase/auth-helpers-react';
+import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
+import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -27,12 +28,38 @@ type ChatRoom = {
 };
 
 type ChatPageProps = {
-  chatRooms: ChatRoom[];
   error?: string;
 };
 
-const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
+const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
   const user = useUser();
+  const supabase = useSupabaseClient();
+
+  const fetcher = async () => {
+    if (!user) return [];
+
+    // 1. ブロック関係にあるユーザーIDのリストを取得
+    const { data: blocksData } = await supabase
+      .from('blocks')
+      .select('blocker_id,blocked_id')
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    const blockedUserIds = new Set<string>();
+    if (blocksData) {
+      for (const block of blocksData) {
+        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+      }
+    }
+
+    // 2. チャットルームを取得
+    const { data, error } = await supabase.rpc('get_chat_rooms_with_details', { p_user_id: user.id });
+    if (error) throw error;
+
+    // 3. ブロックしたユーザーのチャットルームを除外
+    return (data as ChatRoom[]).filter((room: ChatRoom) => !blockedUserIds.has(room.other_user.id));
+  };
+
+  const { data: chatRooms, error, isLoading } = useSWR<ChatRoom[]>('chat_rooms', fetcher);
 
   if (!user) return null;
 
@@ -44,14 +71,16 @@ const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
           <h1 className="text-2xl font-bold mb-6">トーク</h1>
 
           {/* エラー表示 */}
-          {error && (
+          {(error || initialError) && (
             <div className="bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-lg mb-6">
               <p className="font-bold">データ取得エラー</p>
-              <p className="text-sm mt-1">{error}</p>
+              <p className="text-sm mt-1">{error?.message || initialError}</p>
             </div>
           )}
 
-          {chatRooms.length > 0 ? (
+          {isLoading && <p className="text-center py-10">読み込み中...</p>}
+
+          {chatRooms && chatRooms.length > 0 ? (
             <div className="space-y-2">
               {chatRooms.map((room) => (
                 <Link
@@ -106,48 +135,8 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  // 1. ブロック関係にあるユーザーIDのリストを取得
-  const { data: blocksData } = await supabase
-    .from('blocks')
-    .select('blocker_id,blocked_id')
-    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
-  const blockedUserIds = new Set<string>();
-  if (blocksData) {
-    for (const block of blocksData) {
-      if (block.blocker_id === session.user.id) {
-        blockedUserIds.add(block.blocked_id);
-      }
-      if (block.blocked_id === session.user.id) {
-        blockedUserIds.add(block.blocker_id);
-      }
-    }
-  }
-
-  // 2. チャットルームを取得
-  const { data, error } = await supabase.rpc('get_chat_rooms_with_details', {
-    p_user_id: session.user.id,
-  });
-
-  if (error) {
-    console.error('Error fetching chat rooms:', error);
-    return { props: { chatRooms: [], error: error.message } };
-  }
-
-  // 3. ブロックしたユーザーのチャットルームを除外
-  let chatRooms: ChatRoom[] = data.map((room: ChatRoom) => ({
-    id: room.id,
-    other_user: room.other_user,
-    last_message: room.last_message,
-    unread_count: room.unread_count,
-  }));
-
-  if (blockedUserIds.size > 0) {
-    chatRooms = chatRooms.filter((room: ChatRoom) => !blockedUserIds.has(room.other_user.id));
-  }
-
   return {
     props: {
-      chatRooms,
     },
   };
 };

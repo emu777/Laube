@@ -1,10 +1,11 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header'
+import useSWR from 'swr';
 import { FaRegComment } from 'react-icons/fa';
 import BottomNav from '@/components/BottomNav'
 import AvatarIcon from '@/components/AvatarIcon';
@@ -47,11 +48,10 @@ type TimelinePageProps = {
   initialItems: TimelineItem[];
 };
 
-const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
+const TimelinePage: NextPage = () => {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
-  const [items, setItems] = useState(initialItems);
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
@@ -59,11 +59,47 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const fetcher = useCallback(async (key: string) => {
+    if (!user) return [];
+
+    // 1. ブロック関係にあるユーザーIDのリストを取得
+    const { data: blocksData } = await supabase
+      .from('blocks')
+      .select('blocker_id,blocked_id')
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    const blockedUserIds = new Set<string>();
+    if (blocksData) {
+      for (const block of blocksData) {
+        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+      }
+    }
+    const blockedUserIdsArray = Array.from(blockedUserIds);
+
+    // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
+    let postsQuery = supabase
+      .from('posts')
+      .select('*, profiles(username, avatar_url, location, age), comments(*, profiles(username, avatar_url))')
+      .order('created_at', { ascending: false });
+
+    if (blockedUserIdsArray.length > 0) {
+      postsQuery = postsQuery.not('user_id', 'in', `(${blockedUserIdsArray.join(',')})`);
+      postsQuery = postsQuery.filter('comments.user_id', 'not.in', `(${blockedUserIdsArray.join(',')})`);
+    }
+
+    const { data: postsData, error: postsError } = await postsQuery;
+    if (postsError) throw postsError;
+
+    return (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
+  }, [supabase, user]);
+
+  const { data: items, error, isLoading, mutate } = useSWR<TimelineItem[]>('timeline_items', fetcher, {});
+
   // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {
     const hash = router.asPath.split('#')[1];
     if (hash) {
-      const postExists = items.some(item => item.item_type === 'post' && item.id === hash);
+      const postExists = items?.some(item => item.item_type === 'post' && item.id === hash);
       if (postExists) {
         setCommentingPostId(hash);
         // レンダリング後にスクロール
@@ -108,14 +144,14 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
             .select('username, avatar_url, location, age')
             .eq('id', newPost.user_id)
             .single();
-          setItems((currentItems) => [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...currentItems]);
+          mutate(currentItems => [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...(currentItems || [])], false);
         }
       )
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'posts' },
         (payload) => {
-          setItems((currentItems) => currentItems.filter(item => item.id !== payload.old.id));
+          mutate(currentItems => (currentItems || []).filter(item => item.id !== payload.old.id), false);
         }
       )
       .on(
@@ -135,13 +171,13 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
             .eq('id', newComment.post_id)
             .single();
 
-          setItems(currentItems => {
+          mutate(currentItems => {
             // 元の投稿をタイムラインから探す
-            const parentPostIndex = currentItems.findIndex(item => item.item_type === 'post' && item.id === newComment.post_id);
+            const parentPostIndex = (currentItems || []).findIndex(item => item.item_type === 'post' && item.id === newComment.post_id);
             if (parentPostIndex === -1) return currentItems; // 元の投稿が見つからない場合は何もしない
 
             // 元の投稿の情報をコピーし、新しいコメント情報を追加する
-            const parentPost = { ...currentItems[parentPostIndex] } as Post & { item_type: 'post' };
+            const parentPost = { ...(currentItems || [])[parentPostIndex] } as Post & { item_type: 'post' };
             const newCommentForPost: Comment = { ...newComment, profiles: profile, parent_post: parentPostProfile };
             parentPost.comments = [newCommentForPost, ...parentPost.comments];
 
@@ -154,16 +190,16 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
             };
             
             // タイムラインから元の投稿を一旦削除し、コメントと元の投稿を先頭に追加する
-            const filteredItems = currentItems.filter((_, index) => index !== parentPostIndex);
+            const filteredItems = (currentItems || []).filter((_, index) => index !== parentPostIndex);
             return [parentPost, newCommentItem, ...filteredItems];
-          });
+          }, false);
         })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, setItems]);
+  }, [supabase, mutate]);
 
   const handlePost = async () => {
     if (!newPostContent.trim() || !user) return;
@@ -236,7 +272,13 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
 
           {/* 投稿一覧 */}
           <div className="space-y-4">
-            {items.map((item) => {
+            {isLoading && (
+              <div className="text-center py-10">
+                <p>タイムラインを読み込んでいます...</p>
+              </div>
+            )}
+            {error && <div className="text-center py-10 text-red-400">読み込みに失敗しました。</div>}
+            {items && items.map((item) => {
               if (item.item_type === 'comment') {
                 return (
                   <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
@@ -332,7 +374,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                       <div className="mt-4 flex items-center gap-2">
                         <input
                           type="text"
-                          className="w-full bg-gray-700/50 p-2 rounded-full border border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 placeholder-gray-500 text-sm px-4"
+                          className="w-full bg-gray-700/50 p-2 rounded-full border border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 placeholder-gray-500 text-base px-4"
                           placeholder="コメントを追加..."
                           value={newCommentContent}
                           onChange={(e) => setNewCommentContent(e.target.value)}
@@ -400,49 +442,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  // 1. ブロック関係にあるユーザーIDのリストを取得
-  const { data: blocksData } = await supabase
-    .from('blocks')
-    .select('blocker_id,blocked_id')
-    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
-  const blockedUserIds = new Set<string>();
-  if (blocksData) {
-    for (const block of blocksData) {
-      if (block.blocker_id === session.user.id) {
-        blockedUserIds.add(block.blocked_id);
-      }
-      if (block.blocked_id === session.user.id) {
-        blockedUserIds.add(block.blocker_id);
-      }
-    }
-  }
-  const blockedUserIdsArray = Array.from(blockedUserIds);
-
-  // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
-  let postsQuery = supabase
-    .from('posts')
-    .select('*, profiles(username, avatar_url, location, age), comments(*, profiles(username, avatar_url))')
-    .order('created_at', { ascending: false });
-
-  if (blockedUserIdsArray.length > 0) {
-    // ブロックしたユーザーの投稿を除外
-    postsQuery = postsQuery.not('user_id', 'in', `(${blockedUserIdsArray.join(',')})`);
-    // 投稿に紐づくコメントから、ブロックしたユーザーのものを除外
-    postsQuery = postsQuery.filter('comments.user_id', 'not.in', `(${blockedUserIdsArray.join(',')})`);
-  }
-
-  const { data: postsData, error: postsError } = await postsQuery;
-
-  if (postsError) {
-    console.error('投稿データの取得エラー:', postsError);
-  }
-
-  const posts: TimelineItem[] = (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' }));
-  const initialItems = posts;
-
   return {
     props: {
-      initialItems,
+      // initialItemsはSWRで取得するため、空の配列を渡すか、何も渡さない
     },
   };
 };

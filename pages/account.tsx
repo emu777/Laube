@@ -14,6 +14,7 @@ type Profile = {
   age: number | null;
   sexualities: string[] | null;
   position: string | null;
+  vibe: string | null;
   drinking: string | null;
   smoking: string | null;
   bio: string | null;
@@ -38,6 +39,7 @@ export default function Account({ profile }: AccountPageProps) {
   const [age, setAge] = useState<Profile['age']>(profile.age || null)
   const [sexualities, setSexualities] = useState<Profile['sexualities']>(profile.sexualities || [])
   const [position, setPosition] = useState<Profile['position']>(profile.position || '')
+  const [vibe, setVibe] = useState<Profile['vibe']>(profile.vibe || '')
   const [drinking, setDrinking] = useState<Profile['drinking']>(profile.drinking || '')
   const [smoking, setSmoking] = useState<Profile['smoking']>(profile.smoking || '')
   const [bio, setBio] = useState<Profile['bio']>(profile.bio || '')
@@ -50,8 +52,8 @@ export default function Account({ profile }: AccountPageProps) {
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
 
   const isFormInvalid = useMemo(() => {
-    return !username?.trim() || !location || !age || !sexualities || sexualities.length === 0 || !position || !partnerStatus || !maritalStatus;
-  }, [username, location, age, sexualities, position, partnerStatus, maritalStatus]);
+    return !username?.trim() || !location || !age || !sexualities || sexualities.length === 0 || !vibe || !position || !partnerStatus || !maritalStatus || !hobbies || hobbies.length === 0;
+  }, [username, location, age, sexualities, vibe, position, partnerStatus, maritalStatus, hobbies]);
 
   useEffect(() => {
     setLoading(false);
@@ -64,6 +66,7 @@ export default function Account({ profile }: AccountPageProps) {
     age,
     sexualities,
     position,
+    vibe,
     drinking,
     smoking,
     bio,
@@ -86,6 +89,7 @@ export default function Account({ profile }: AccountPageProps) {
         age,
         sexualities,
         position,
+        vibe,
         drinking,
         smoking,
         bio,
@@ -121,6 +125,7 @@ export default function Account({ profile }: AccountPageProps) {
       age,
       sexualities,
       position,
+      vibe,
       drinking,
       smoking,
       bio,
@@ -172,7 +177,9 @@ export default function Account({ profile }: AccountPageProps) {
 
   const ageOptions = Array.from({ length: 82 }, (_, i) => i + 18)
 
-  const positionOptions = ['タチ', 'リバタチ', 'リバ', 'リバネコ', 'ネコ', 'ノンケ', 'フェム', 'ボイ', '中性', 'その他', '分からない', '決めていない']
+  const vibeOptions = ['フェム', '中性', 'ボイ', '気分で変わる']
+
+  const positionOptions = ['タチ', 'リバタチ', 'リバ', 'リバネコ', 'ネコ', '分からない']
 
   const drinkingOptions = ['呑まない', 'たまに', 'よく呑む']
 
@@ -182,9 +189,9 @@ export default function Account({ profile }: AccountPageProps) {
     '音楽', 'ゲーム', '動物', '映画', 'スポーツ', '読書', '美容', 'グルメ・カフェ', '料理', 'ドライブ', '観劇', 'ものづくり', 'アウトドア', 'インドア'
   ]
 
-  const partnerStatusOptions = ['無', '有']
+  const partnerStatusOptions = ['いる', 'いない']
 
-  const maritalStatusOptions = ['未婚（子無し）', '未婚（子有り）', '既婚（子無し）', '既婚（子有り）']
+  const maritalStatusOptions = ['未婚', '未婚（子有り）', '既婚', '既婚（子有り）']
 
   const datingExperienceOptions = ['有', '無']
 
@@ -255,6 +262,14 @@ export default function Account({ profile }: AccountPageProps) {
               </div>
             </div>
             <div className="space-y-2 relative">
+              <label htmlFor="vibe" className="text-sm font-medium text-gray-400">雰囲気</label>
+              <select id="vibe" value={vibe || ''} onChange={(e) => setVibe(e.target.value)} className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors" required>
+                <option value="">選択してください</option>
+                {vibeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400"><svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
+            </div>
+            <div className="space-y-2 relative">
               <label htmlFor="position" className="text-sm font-medium text-gray-400">ポジション</label>
               <select id="position" value={position || ''} onChange={(e) => setPosition(e.target.value)} className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors" required>
                 <option value="">選択してください</option>
@@ -272,12 +287,23 @@ export default function Account({ profile }: AccountPageProps) {
                 <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400"><svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
               </div>
               <div className="space-y-2 relative">
-                <label htmlFor="marital_status" className="text-sm font-medium text-gray-400">結婚・子供</label>
+                  <label htmlFor="marital_status" className="text-sm font-medium text-gray-400">結婚（子供）</label>
                 <select id="marital_status" value={maritalStatus || ''} onChange={(e) => setMaritalStatus(e.target.value)} className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors" required>
                   <option value="">選択してください</option>
                   {maritalStatusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400"><svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
+              </div>
+            </div>
+            <div className="space-y-3 pt-2">
+              <label className="text-sm font-medium text-gray-400">趣味（複数選択可）</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                {hobbyOptions.map(opt => (
+                  <div key={opt} className="flex items-center">
+                    <input type="checkbox" id={`hobby-${opt}`} value={opt} checked={(hobbies || []).includes(opt)} onChange={handleHobbyChange} className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600" />
+                    <label htmlFor={`hobby-${opt}`} className="ml-3 text-sm">{opt}</label>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -330,17 +356,6 @@ export default function Account({ profile }: AccountPageProps) {
                     <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400"><svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
                   </div>
                 </div>
-                <div className="space-y-3 pt-2">
-                  <label className="text-sm font-medium text-gray-400">趣味（複数選択可）</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                    {hobbyOptions.map(opt => (
-                      <div key={opt} className="flex items-center">
-                        <input type="checkbox" id={`hobby-${opt}`} value={opt} checked={(hobbies || []).includes(opt)} onChange={handleHobbyChange} className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600" />
-                        <label htmlFor={`hobby-${opt}`} className="ml-3 text-sm">{opt}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -383,7 +398,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   const { data: profileData, error } = await supabase
     .from('profiles')
-    .select(`*, partner_status, marital_status, dating_experience, mbti`)
+    .select(`*`)
     .eq('id', session.user.id)
     .single();
 

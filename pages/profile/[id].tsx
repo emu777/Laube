@@ -2,11 +2,13 @@ import { GetServerSidePropsContext, NextPage } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import useSWR from 'swr'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
+import PageLoader from '@/components/PageLoader'
 
 type Profile = {
   id: string
@@ -16,6 +18,7 @@ type Profile = {
   age: number | null
   sexualities: string[] | null
   position: string | null
+  vibe: string | null
   drinking: string | null
   smoking: string | null
   bio: string | null
@@ -27,22 +30,61 @@ type Profile = {
 }
 
 type ProfilePageProps = {
-  profile: Profile | null
-  isLiked: boolean
-  isLikedBy: boolean
-  isMyProfile: boolean
-  isMatched: boolean
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile, isMatched: initialIsMatched }) => {
+const ProfilePage: NextPage<ProfilePageProps> = () => {
   const supabase = useSupabaseClient()
   const user = useUser()
   const router = useRouter()
+  const { id: profileId } = router.query as { id: string };
+
+  const fetcher = useCallback(async (key: string) => {
+    if (!profileId || !user) return null;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', profileId)
+      .single();
+
+    if (error || !profile) {
+      throw new Error('User not found');
+    }
+
+    const isMyProfile = user.id === profile.id;
+    let isLiked = false;
+    let isLikedBy = false;
+
+    if (!isMyProfile) {
+      const { count: likeCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('liker_id', user.id).eq('liked_id', profile.id);
+      isLiked = (likeCount ?? 0) > 0;
+
+      const { count: likedByCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('liker_id', profile.id).eq('liked_id', user.id);
+      isLikedBy = (likedByCount ?? 0) > 0;
+    }
+
+    const isMatched = isLiked && isLikedBy;
+
+    return { profile, isLiked, isLikedBy, isMyProfile, isMatched };
+  }, [supabase, user, profileId]);
+
+  const { data, error, isLoading } = useSWR(profileId ? `profile_${profileId}` : null, fetcher);
+
+  const { profile, isLiked: initialIsLiked, isLikedBy, isMyProfile, isMatched: initialIsMatched } = data || {};
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [isLiked, setIsLiked] = useState(initialIsLiked)
-  const [isMatched, setIsMatched] = useState(initialIsMatched)
+  const [isLiked, setIsLiked] = useState(false)
+  const [isMatched, setIsMatched] = useState(false)
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showUnlikeConfirm, setShowUnlikeConfirm] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setIsLiked(data.isLiked);
+      setIsMatched(data.isMatched);
+    }
+  }, [data]);
 
   useEffect(() => {
     if (profile?.avatar_url) {
@@ -78,13 +120,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     if (!user || !profile || isMyProfile) return
 
     if (isLiked) {
-      // いいねを取り消す
-      const { error } = await supabase.from('likes').delete().match({ liker_id: user.id, liked_id: profile.id })
-      if (error) {
-        console.error('Error unliking profile:', error)
-      } else {
-        setIsLiked(false)
-      }
+      // いいね取り消し確認モーダルを表示
+      setShowUnlikeConfirm(true);
     } else {
       // いいねする (マッチング成立かチェック)
       const { error } = await supabase.from('likes').insert({ liker_id: user.id, liked_id: profile.id })
@@ -115,6 +152,18 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     setIsLiked(true);
     setIsMatched(true);
     await createChatRoom();
+  };
+
+  const handleUnlike = async () => {
+    if (!user || !profile) return;
+    const { error } = await supabase.from('likes').delete().match({ liker_id: user.id, liked_id: profile.id });
+    if (error) {
+      console.error('Error unliking profile:', error);
+      alert('処理に失敗しました。');
+    } else {
+      setIsLiked(false);
+    }
+    setShowUnlikeConfirm(false);
   };
 
   const executeReject = async () => {
@@ -154,15 +203,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     router.push('/');
   };
 
-  if (!profile) {
+  if (isLoading) {
+    return <PageLoader />
+  }
+
+  if (error || !profile) {
     return (
       <div className="bg-gray-900 min-h-screen text-white">
         <Header />
         <main className="p-4 pt-24 text-center">
           <p>ユーザーが見つかりませんでした。</p>
-          <Link href="/" className="text-blue-400 hover:underline">
+          <button onClick={() => router.back()} className="mt-4 text-blue-400 hover:underline">
             一覧に戻る
-          </Link>
+          </button>
         </main>
       </div>
     )
@@ -237,44 +290,47 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
                       {profile.position && <span>{profile.position}</span>}
                     </>
                   )}
+                  {profile.vibe && (
+                    <span className="ml-2 bg-black/30 text-white text-xs font-medium px-2 py-1 rounded-full">{profile.vibe}</span>
+                  )}
                 </div>
               </div>
-
-              {/* いいねボタン */}
-              {!isMyProfile && (
-                <div className="absolute bottom-4 right-4">
-                  <button
-                    onClick={handleLike}
-                    disabled={isMatched}
-                    className={`rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center gap-2 px-4 py-3 border-2 shadow-xl ${
-                      isMatched
-                        ? 'bg-green-500 text-white border-green-500 cursor-not-allowed'
-                        : isLiked
-                        ? 'bg-pink-500 text-white border-pink-500'
-                        : 'bg-white text-pink-500 border-white hover:bg-pink-50'
-                    }`}
-                    aria-label={isMatched ? 'フレンド' : (isLiked ? '「気になる」を取り消す' : '気になる')}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill={isLiked ? 'currentColor' : 'none'}
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z"
-                      />
-                    </svg>
-                    <span className="font-bold text-sm">{isMatched ? 'フレンド' : (isLiked ? '気になる済' : '気になる')}</span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* いいねボタン */}
+          {!isMyProfile && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={handleLike}
+                disabled={isMatched}
+                className={`rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center gap-2 px-4 py-3 border-2 shadow-xl ${
+                  isMatched
+                    ? 'bg-pink-600 text-white border-pink-600 cursor-not-allowed'
+                    : isLiked
+                    ? 'bg-pink-900/60 text-pink-300 border-pink-800/80 hover:bg-pink-900/80'
+                    : 'bg-white text-pink-500 border-white hover:bg-pink-50 animate-float-and-pulse'
+                }`}
+                aria-label={isMatched ? 'フレンド' : (isLiked ? '片想い中' : '気になる')}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill={isLiked ? 'currentColor' : 'none'}
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z"
+                  />
+                </svg>
+                <span className="font-bold text-sm">{isMatched ? 'フレンド' : (isLiked ? '片想い中…' : '気になる')}</span>
+              </button>
+            </div>
+          )}
 
           {profile.hobbies && profile.hobbies.length > 0 && (
             <>
@@ -305,7 +361,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
             )}
             {profile.marital_status && (
               <div className="flex items-baseline">
-                <span className="text-gray-400">結婚・子供 --</span>
+                <span className="text-gray-400">結婚（子供） --</span>
                 <span className="font-semibold text-white ml-2">{profile.marital_status}</span>
               </div>
             )}
@@ -380,6 +436,22 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
         </div>
       )}
 
+      {/* いいね解除確認モーダル */}
+      {showUnlikeConfirm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
+            <h2 className="text-lg font-bold text-white">確認</h2>
+            <p className="text-sm text-gray-300">
+              片想いを諦めますか？
+            </p>
+            <div className="flex gap-4 pt-2">
+              <button onClick={handleUnlike} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">はい</button>
+              <button onClick={() => setShowUnlikeConfirm(false)} className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 transition-colors">諦めない</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   )
@@ -388,49 +460,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
 export default ProfilePage
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx)
-  const { data: { session } } = await supabase.auth.getSession()
-
-  if (!session) {
-    return { redirect: { destination: '/login', permanent: false } }
-  }
-
-  const { id } = ctx.params as { id: string }
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error || !profile) {    
-    return { props: { profile: null, isLiked: false, isLikedBy: false, isMyProfile: false, isMatched: false } }
-  }
-
-  const isMyProfile = session.user.id === profile.id
-  let isLiked = false
-  let isLikedBy = false
-
-  if (!isMyProfile) {
-    // 自分が相手をいいねしているか
-    const { count: likeCount } = await supabase
-      .from('likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('liker_id', session.user.id)
-      .eq('liked_id', profile.id)
-    isLiked = (likeCount ?? 0) > 0;
-
-    // 相手が自分をいいねしているか
-    const { count: likedByCount } = await supabase
-      .from('likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('liker_id', profile.id)
-      .eq('liked_id', session.user.id)
-    isLikedBy = (likedByCount ?? 0) > 0;
-  }
-
-  const isMatched = isLiked && isLikedBy;
-
   return {
-    props: { profile, isLiked, isLikedBy, isMyProfile, isMatched },
+    props: {},
   }
 }

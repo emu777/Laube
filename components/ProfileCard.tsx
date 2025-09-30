@@ -10,6 +10,7 @@ type Profile = {
   location: string | null;
   age: number | null;
   hobbies: string[] | null;
+  bio: string | null;
 }
 
 const ProfileCard = ({ profile }: { profile: Profile }) => {
@@ -25,7 +26,7 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
 
   return (
     <Link href={`/profile/${profile.id}`} className="block transition-transform duration-200 hover:scale-105">
-      <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[160px]">
+      <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[150px]">
         <div className="relative w-full aspect-square">
           {avatarUrl ? (
             <Image
@@ -33,7 +34,7 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
               alt="avatar"
               className="w-full h-full object-cover"
               fill
-              sizes="160px"
+              sizes="150px"
             />
           ) : (
             <div className="w-full h-full bg-gray-700 flex items-center justify-center">
@@ -49,15 +50,13 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
           <p className="m-0 text-xs text-gray-400">
             {profile.location || '未設定'}・{profile.age || '??'}歳
           </p>
-          {profile.hobbies && profile.hobbies.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1 justify-center">
-              {profile.hobbies.slice(0, 3).map(hobby => (
-                <span key={hobby} className="bg-gray-700/80 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full">
-                  {hobby}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 justify-center min-h-[58px] px-2">
+            {profile.hobbies?.slice(0, 3).map((hobby: string) => (
+              <span key={hobby} className="bg-gray-700/80 text-gray-300 text-xs font-medium px-2 py-0.5 rounded-full">
+                {hobby}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </Link>

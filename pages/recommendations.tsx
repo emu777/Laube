@@ -1,9 +1,10 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import useSWR from 'swr';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
@@ -22,8 +23,6 @@ type Recommendation = {
 };
 
 type RecommendationsPageProps = {
-  initialRecommendations: Recommendation[];
-  unreadNotificationCount: number;
 };
 
 const getYouTubeVideoId = (url: string): string | null => {
@@ -41,15 +40,45 @@ const getYouTubeVideoId = (url: string): string | null => {
   }
 };
 
-const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecommendations, unreadNotificationCount }) => {
+const RecommendationsPage: NextPage = () => {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
-  const [recommendations] = useState(initialRecommendations);
   const [newUrl, setNewUrl] = useState('');
   const [newComment, setNewComment] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const fetcher = useCallback(async () => {
+    if (!user) return [];
+
+    // 1. ブロック関係にあるユーザーIDのリストを取得
+    const { data: blocksData } = await supabase
+      .from('blocks')
+      .select('blocker_id,blocked_id')
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    const blockedUserIds = new Set<string>();
+    if (blocksData) {
+      for (const block of blocksData) {
+        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+      }
+    }
+
+    // 2. オススメを取得 (ブロックしたユーザーは除外)
+    let recommendationsQuery = supabase
+      .from('recommendations')
+      .select('*, category, profiles(username, avatar_url)')
+      .order('created_at', { ascending: false });
+    if (blockedUserIds.size > 0) {
+      recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+    }
+    const { data, error } = await recommendationsQuery;
+    if (error) throw error;
+    return data || [];
+  }, [supabase, user]);
+
+  const { data: recommendations, error, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {
@@ -83,7 +112,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
   const categories = ['すべて', '音楽', '動物', 'ゲーム', '映画', 'お笑い', '美容', '日常', 'エンタメ', '学習', 'その他'];
   const [filterCategory, setFilterCategory] = useState('すべて');
 
-  const filteredRecommendations = recommendations.filter(rec => {
+  const filteredRecommendations = recommendations?.filter(rec => {
     if (filterCategory === 'すべて') return true;
     return rec.category === filterCategory;
   });
@@ -110,7 +139,9 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
 
           {/* 投稿一覧 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRecommendations.map((rec) => {
+            {isLoading && <p>読み込み中...</p>}
+            {error && <p className="text-red-400">読み込みに失敗しました。</p>}
+            {filteredRecommendations && filteredRecommendations.map((rec) => {
               const videoId = getYouTubeVideoId(rec.youtube_url);
               return videoId ? (
                 <div key={rec.id} className="bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden shadow-md">
@@ -150,14 +181,17 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-white">お気に入りを共有</h2>
-              <input
-                type="url"
-                className="w-full bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 placeholder-gray-400 text-white"
-                placeholder="YouTubeの動画URL"
-                value={newUrl}
-                onChange={(e) => setNewUrl(e.target.value)}
-                required
-              />
+              <div>
+                <input
+                  type="url"
+                  className="w-full bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 placeholder-gray-400 text-white"
+                  placeholder="YouTubeの動画URL"
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1.5 px-1">※ショート動画は投稿出来ません</p>
+              </div>
               <div className="relative">
                 <select
                   className="w-full bg-gray-700/50 p-3 rounded-lg border border-gray-600 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-white"
@@ -214,39 +248,8 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  // 1. ブロック関係にあるユーザーIDのリストを取得
-  const { data: blocksData } = await supabase
-    .from('blocks')
-    .select('blocker_id,blocked_id')
-    .or(`blocker_id.eq.${session.user.id},blocked_id.eq.${session.user.id}`);
-  const blockedUserIds = new Set<string>();
-  if (blocksData) {
-    for (const block of blocksData) {
-      if (block.blocker_id === session.user.id) {
-        blockedUserIds.add(block.blocked_id);
-      }
-      if (block.blocked_id === session.user.id) {
-        blockedUserIds.add(block.blocker_id);
-      }
-    }
-  }
-
-  // 2. オススメを取得 (ブロックしたユーザーは除外)
-  let recommendationsQuery = supabase
-    .from('recommendations')
-    .select('*, category, profiles(username, avatar_url)')
-    .order('created_at', { ascending: false });
-  if (blockedUserIds.size > 0) {
-    recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
-  }
-  const { data: recommendations, error } = await recommendationsQuery;
-  if (error) {
-    console.error('Error fetching recommendations:', error);
-  }
-
   return {
     props: {
-      initialRecommendations: recommendations || [],
     },
   };
 };

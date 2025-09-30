@@ -1,18 +1,10 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState } from 'react';
+import { useState, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import AvatarIcon from '@/components/AvatarIcon';
 import PageLayout from '@/components/PageLayout';
-import {
-  SwipeableList,
-  SwipeableListItem,
-  SwipeAction,
-  TrailingActions,
-  useSwipeableList,
-} from 'react-swipeable-list';
-import 'react-swipeable-list/dist/styles.css';
 
 type Profile = {
   id: string;
@@ -29,26 +21,30 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
   const user = useUser();
   const [friendList, setFriendList] = useState(friends);
   const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
-  const { getSwipeableItemProps, parentSwipeableListProps } = useSwipeableList();
+  const [swipedItemId, setSwipedItemId] = useState<string | null>(null);
+  const dragStartX = useRef(0);
 
-  const trailingActions = (friendId: string) => (
-    <TrailingActions>
-      <SwipeAction
-        destructive={true}
-        onClick={() => {
-          parentSwipeableListProps.closeSwipedItem();
-          const friendToBlock = friendList.find((f) => f.id === friendId);
-          if (friendToBlock) {
-            setUserToBlock(friendToBlock);
-          }
-        }}
-      >
-        <div className="bg-red-600 flex items-center justify-center text-white h-full px-6">
-          <span className="font-bold">ブロック</span>
-        </div>
-      </SwipeAction>
-    </TrailingActions>
-  );
+  const handleDragStart = (e: ReactMouseEvent<HTMLDivElement>, id: string) => {
+    dragStartX.current = e.clientX;
+    setSwipedItemId(id);
+  };
+
+  const handleDragEnd = (e: ReactMouseEvent<HTMLDivElement>, friend: Profile) => {
+    const dragEndX = e.clientX;
+    const dragDistance = dragStartX.current - dragEndX;
+
+    // 50px以上左にスワイプされたらブロック確認
+    if (dragDistance > 50) {
+      setUserToBlock(friend);
+    }
+    // スワイプが終わったらリセット
+    setSwipedItemId(null);
+    dragStartX.current = 0;
+  };
+
+  const handleBlockCancel = () => {
+    setUserToBlock(null);
+  };
 
   const handleBlockConfirm = async () => {
     if (!user || !userToBlock) return;
@@ -74,26 +70,36 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
       <h1 className="text-2xl font-bold mb-6">フレンド一覧</h1>
 
       {friendList.length > 0 ? (
-        <div {...parentSwipeableListProps}>
-          <SwipeableList fullSwipe={false}>
-            {friendList.map((friend) => (
-              <SwipeableListItem
-                key={friend.id}
-                {...getSwipeableItemProps(friend.id)}
-                trailingActions={trailingActions(friend.id)}
+        <div className="overflow-hidden">
+          {friendList.map((friend) => (
+            <div key={friend.id} className="relative bg-gray-900">
+              {/* ブロックボタン (背景) */}
+              <div className="absolute inset-y-0 right-0 bg-red-600 flex items-center justify-center px-6">
+                <span className="font-bold text-white">ブロック</span>
+              </div>
+
+              {/* フレンド情報 (スワイプする要素) */}
+              <div
+                className="relative bg-gray-900 border-b border-gray-700 transition-transform duration-200 ease-out"
+                style={{ transform: swipedItemId === friend.id ? 'translateX(-100px)' : 'translateX(0)' }}
+                onMouseDown={(e) => handleDragStart(e, friend.id)}
+                onMouseUp={(e) => handleDragEnd(e, friend)}
+                onTouchStart={(e) => { dragStartX.current = e.touches[0].clientX; setSwipedItemId(friend.id); }}
+                onTouchEnd={(e) => {
+                  const dragEndX = e.changedTouches[0].clientX;
+                  const dragDistance = dragStartX.current - dragEndX;
+                  if (dragDistance > 50) setUserToBlock(friend);
+                  setSwipedItemId(null);
+                  dragStartX.current = 0;
+                }}
               >
-                <div className="border-b border-gray-700">
-                  <Link
-                    href={`/profile/${friend.id}`}
-                    className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
-                  >
-                    <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />
-                    <p className="font-bold text-white truncate flex-1">{friend.username || '未設定'}</p>
-                  </Link>
-                </div>
-              </SwipeableListItem>
-            ))}
-          </SwipeableList>
+                <Link href={`/profile/${friend.id}`} className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors">
+                  <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />
+                  <p className="font-bold text-white truncate flex-1">{friend.username || '未設定'}</p>
+                </Link>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="text-center py-12">
@@ -110,7 +116,7 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
               {userToBlock.username}さんをブロックします。よろしいですか？
             </p>
             <div className="flex gap-4 pt-2">
-              <button onClick={() => setUserToBlock(null)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+              <button onClick={handleBlockCancel} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
                 いいえ
               </button>
               <button onClick={handleBlockConfirm} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">

@@ -24,9 +24,22 @@ type Notification = {
   } | null;
 };
 
+type GroupedNotification = Notification & {
+  is_grouped: true;
+  count: number;
+  senders: (Notification['sender'] & { is_read: boolean })[];
+};
+
+type DisplayNotification = Notification | GroupedNotification;
+
 type NotificationsPageProps = {
-  notifications: Notification[];
+  notifications: DisplayNotification[];
   unreadNotificationCount: number;
+};
+
+// 型ガード関数
+const isGroupedNotification = (notification: DisplayNotification): notification is GroupedNotification => {
+  return 'is_grouped' in notification && notification.is_grouped === true;
 };
 
 const getNotificationInfo = (notification: Notification) => {
@@ -59,7 +72,7 @@ const getNotificationInfo = (notification: Notification) => {
   }
 };
 
-const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications, unreadNotificationCount }) => {
+const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: initialNotifications, unreadNotificationCount }) => {
   const supabase = useSupabaseClient();
   const router = useRouter();
 
@@ -86,27 +99,69 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications, un
       <main className="p-4 pt-24 pb-24">
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">通知</h1>
-
-          {notifications.length > 0 ? (
+          
+          {initialNotifications.length > 0 ? (
             <div className="space-y-2">
-              {notifications.map((notification) => {
-                const { icon, message, href } = getNotificationInfo(notification);
+              {initialNotifications.map((notification) => {
+                if (isGroupedNotification(notification)) {
+                  const { icon, message: messageTemplate, href } = getNotificationInfo(notification);
+                  const latestSender = notification.sender;
+                  const otherSendersCount = notification.count > 1 ? notification.count - 1 : 0; // 1件の場合は「他0人」と表示しない
+                  const message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}があなたの事を気になっています`;
+                  const isUnread = notification.senders.some(s => !s.is_read);
+
+                  return (
+                    <div
+                      key={notification.type + (notification.type === 'comment' ? notification.reference_id : '')}
+                      onClick={() => router.push(href)}
+                      className={`flex items-center gap-4 p-4 rounded-xl transition-colors cursor-pointer ${
+                        isUnread ? 'bg-pink-900/20 border border-pink-800/50' : 'bg-gray-800/50'
+                      } hover:bg-gray-700/60`}
+                    >
+                      <div className="relative flex -space-x-4">
+                        {notification.senders.slice(0, 3).map((sender, index) => (
+                           <AvatarIcon key={sender?.id || index} avatarUrlPath={sender?.avatar_url} size={40} />
+                        ))}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        {isUnread && (
+                          <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">New</span>
+                        )}
+                        <p className="text-sm text-gray-300">{message}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-gray-500">
+                            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ja })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">{icon}</div>
+                    </div>
+                  );
+                }
+
+                // 通常の通知
+                const { icon, message, href } = getNotificationInfo(notification as Notification);
                 return (
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick({ ...notification, href })}
-                    className={`flex items-start gap-4 p-4 rounded-xl transition-colors cursor-pointer ${
+                    className={`flex items-center gap-4 p-4 rounded-xl transition-colors cursor-pointer ${
                       notification.is_read ? 'bg-gray-800/50' : 'bg-pink-900/20 border border-pink-800/50'
                     } hover:bg-gray-700/60`}
                   >
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">{icon}</div>
-                    <div className="flex-1 overflow-hidden">
-                      <p className="text-sm text-gray-300">{message}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ja })}
-                      </p>
-                    </div>
                     <AvatarIcon avatarUrlPath={notification.sender?.avatar_url} size={40} />
+                    <div className="flex-1 overflow-hidden">
+                       {!notification.is_read && (
+                         <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">New</span>
+                       )}
+                       <p className="text-sm text-gray-300">{message}</p>
+                       <div className="flex items-center gap-2 mt-1">
+                         <p className="text-xs text-gray-500">
+                           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ja })}
+                         </p>
+                       </div>
+                    </div>
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">{icon}</div>
                   </div>
                 );
               })}
@@ -141,5 +196,52 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   if (error) console.error('Error fetching notifications:', error);
 
-  return { props: { notifications: notifications || [] } };
+  const groupedNotifications: DisplayNotification[] = [];
+  const likeGroup: Notification[] = [];
+  const messageGroups: { [key: string]: Notification[] } = {};
+  const commentGroups: { [key: string]: Notification[] } = {};
+
+  // 通知を種類ごとに分類
+  (notifications || []).forEach(n => {
+    if (n.type === 'like') {
+      likeGroup.push(n);
+    } else if (n.type === 'message') {
+      if (!messageGroups[n.sender?.id || '']) messageGroups[n.sender?.id || ''] = [];
+      messageGroups[n.sender?.id || ''].push(n);
+    } else if (n.type === 'comment') {
+      if (!commentGroups[n.reference_id]) commentGroups[n.reference_id] = [];
+      commentGroups[n.reference_id].push(n);
+    } else {
+      groupedNotifications.push(n);
+    }
+  });
+
+  // いいねをグループ化
+  if (likeGroup.length > 0) {
+    const latest = likeGroup[0];
+    groupedNotifications.push({
+      ...latest,
+      is_grouped: true,
+      count: likeGroup.length,
+      senders: likeGroup.map(n => n.sender ? { ...n.sender, is_read: n.is_read } : null).filter(Boolean) as GroupedNotification['senders'],
+    });
+  }
+
+  // コメントを投稿ごとにグループ化
+  Object.values(commentGroups).forEach(group => {
+    if (group.length > 1) {
+      const latest = group[0];
+      groupedNotifications.push({ ...latest, is_grouped: true, count: group.length, senders: group.map(n => n.sender ? { ...n.sender, is_read: n.is_read } : null).filter(Boolean) as GroupedNotification['senders'] });
+    } else {
+      groupedNotifications.push(group[0]);
+    }
+  });
+
+  // トークは送信者ごとに最新の1件のみ表示
+  Object.values(messageGroups).forEach(group => groupedNotifications.push(group[0]));
+
+  // 最新順にソート
+  groupedNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return { props: { notifications: groupedNotifications } };
 };
