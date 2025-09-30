@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FaBell, FaRegCompass, FaFilm, FaComments } from 'react-icons/fa';
+import { FaBell, FaFilm, FaComments } from 'react-icons/fa';
 import { useNotifications } from '../contexts/NotificationContext';
 
 const BottomNav = () => {

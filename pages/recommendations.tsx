@@ -22,9 +22,6 @@ type Recommendation = {
   } | null;
 };
 
-type RecommendationsPageProps = {
-};
-
 const getYouTubeVideoId = (url: string): string | null => {
   try {
     const urlObj = new URL(url);
@@ -78,7 +75,7 @@ const RecommendationsPage: NextPage = () => {
     return data || [];
   }, [supabase, user]);
 
-  const { data: recommendations, error, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
+  const { data: recommendations, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {

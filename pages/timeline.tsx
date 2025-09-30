@@ -44,10 +44,6 @@ type Post = {
 
 type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'comment' });
 
-type TimelinePageProps = {
-  initialItems: TimelineItem[];
-};
-
 const TimelinePage: NextPage = () => {
   const supabase = useSupabaseClient();
   const user = useUser();
@@ -59,7 +55,7 @@ const TimelinePage: NextPage = () => {
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const fetcher = useCallback(async (key: string) => {
+  const fetcher = useCallback(async () => {
     if (!user) return [];
 
     // 1. ブロック関係にあるユーザーIDのリストを取得

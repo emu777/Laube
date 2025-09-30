@@ -1,7 +1,7 @@
 import { GetServerSidePropsContext, NextPage } from 'next'
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import useSWR from 'swr';
@@ -134,7 +134,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   };
 
   const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>('profiles', profilesFetcher);
-  const { data: likedByUsers, isLoading: isLoadingLikedBy } = useSWR<LikedByUser[]>('likedByUsers', likedByUsersFetcher);
+  const { data: likedByUsers } = useSWR<LikedByUser[]>('likedByUsers', likedByUsersFetcher);
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
@@ -229,7 +229,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   // ログインユーザーのプロフィールを取得して新規ユーザーか判定
-  const { data: userProfile, error } = await supabase
+  const { data: userProfile } = await supabase
     .from('profiles')
     .select('username')
     .eq('id', session.user.id)

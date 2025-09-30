@@ -2,7 +2,6 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
@@ -72,7 +71,7 @@ const getNotificationInfo = (notification: Notification) => {
   }
 };
 
-const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: initialNotifications, unreadNotificationCount }) => {
+const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: initialNotifications }) => {
   const supabase = useSupabaseClient();
   const router = useRouter();
 
@@ -104,7 +103,7 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
             <div className="space-y-2">
               {initialNotifications.map((notification) => {
                 if (isGroupedNotification(notification)) {
-                  const { icon, message: messageTemplate, href } = getNotificationInfo(notification);
+                  const { icon, href } = getNotificationInfo(notification);
                   const latestSender = notification.sender;
                   const otherSendersCount = notification.count > 1 ? notification.count - 1 : 0; // 1件の場合は「他0人」と表示しない
                   const message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}があなたの事を気になっています`;

@@ -1,9 +1,7 @@
-import { GetServerSidePropsContext, NextPage } from 'next'
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
+import { NextPage } from 'next'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
 import { useRouter } from 'next/router'
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import Image from 'next/image'
 import useSWR from 'swr'
 import Header from '@/components/Header'
@@ -29,16 +27,13 @@ type Profile = {
   mbti: string | null;
 }
 
-type ProfilePageProps = {
-}
-
-const ProfilePage: NextPage<ProfilePageProps> = () => {
+const ProfilePage: NextPage = () => {
   const supabase = useSupabaseClient()
   const user = useUser()
   const router = useRouter()
   const { id: profileId } = router.query as { id: string };
 
-  const fetcher = useCallback(async (key: string) => {
+  const fetcher = useCallback(async () => {
     if (!profileId || !user) return null;
 
     const { data: profile, error } = await supabase
@@ -70,7 +65,7 @@ const ProfilePage: NextPage<ProfilePageProps> = () => {
 
   const { data, error, isLoading } = useSWR(profileId ? `profile_${profileId}` : null, fetcher);
 
-  const { profile, isLiked: initialIsLiked, isLikedBy, isMyProfile, isMatched: initialIsMatched } = data || {};
+  const { profile, isLikedBy, isMyProfile } = data || {};
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isLiked, setIsLiked] = useState(false)
@@ -459,7 +454,7 @@ const ProfilePage: NextPage<ProfilePageProps> = () => {
 
 export default ProfilePage
 
-export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
+export const getServerSideProps = async () => {
   return {
     props: {},
   }

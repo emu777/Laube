@@ -7,7 +7,7 @@ const PullToRefresh = dynamic(() => import('react-pull-to-refresh'), {
 });
 
 type DynamicPullToRefreshProps = {
-  onRefresh: () => Promise<any>;
+  onRefresh: () => Promise<void>;
   children: React.ReactNode;
 };
 

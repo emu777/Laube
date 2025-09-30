@@ -2,7 +2,7 @@ declare module 'react-pull-to-refresh' {
   import * as React from 'react';
 
   interface PullToRefreshProps {
-    onRefresh: () => Promise<any>;
+    onRefresh: () => Promise<void>;
     children: React.ReactNode;
   }
 

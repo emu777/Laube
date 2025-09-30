@@ -3,8 +3,6 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
 import AvatarIcon from '@/components/AvatarIcon';
 
 type Profile = {
