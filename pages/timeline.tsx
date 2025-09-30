@@ -1,13 +1,15 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header'
 import { FaRegComment } from 'react-icons/fa';
 import BottomNav from '@/components/BottomNav'
 import AvatarIcon from '@/components/AvatarIcon';
+import { formatDistanceToNow } from 'date-fns';
+import { ja } from 'date-fns/locale';
 
 type Comment = {
   id: string;
@@ -33,6 +35,8 @@ type Post = {
   profiles: {
     username: string | null;
     avatar_url: string | null;
+    location: string | null;
+    age: number | null;
   } | null;
   comments: Comment[];
 };
@@ -52,6 +56,8 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [newCommentContent, setNewCommentContent] = useState('');
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {
@@ -71,6 +77,23 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
     }
   }, [router.asPath, items]);
 
+  // メニューの外側をクリックしたときにメニューを閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuPostId(null);
+      }
+    };
+
+    if (openMenuPostId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openMenuPostId]);
+
   // リアルタイムで新しい投稿を購読する
   useEffect(() => {
     const channel = supabase
@@ -82,7 +105,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
           const newPost = payload.new as Post;
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username, avatar_url')
+            .select('username, avatar_url, location, age')
             .eq('id', newPost.user_id)
             .single();
           setItems((currentItems) => [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...currentItems]);
@@ -102,7 +125,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
           const newComment = payload.new as Comment;
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username, avatar_url')
+            .select('username, avatar_url, location, age')
             .eq('id', newComment.user_id)
             .single();
 
@@ -217,12 +240,8 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
               if (item.item_type === 'comment') {
                 return (
                   <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
-                    <div className="flex space-x-4">
-                      <Link href={`/profile/${item.user_id}`} className="flex-shrink-0 cursor-pointer">
-                        <div className="relative w-[30px] h-[30px] rounded-full bg-gray-700 overflow-hidden">
-                          <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={30} />
-                        </div>
-                      </Link>
+                    <div className="flex items-start space-x-4">
+                      <Link href={`/profile/${item.user_id}`} className="flex-shrink-0 cursor-pointer"><AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} /></Link>
                       <div className="flex-1">
                         <div className="text-xs text-gray-400 mb-2">
                           <Link href={`/profile/${item.parent_post?.user_id}`} className="font-bold text-pink-400 hover:underline">
@@ -246,37 +265,51 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
               return (
                 <div key={post.id} id={post.id}>
                   <div className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
-                    <div className="flex space-x-4">
-                      <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
-                        <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={30} />
-                      </Link>
+                    <div className="flex items-start space-x-4">
+                      <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer"><AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} /></Link>
                       <div className="flex-1 flex flex-col">
                         <div className="flex-1">
-                          <div className="flex items-baseline space-x-2">
-                            <p className="font-bold">{post.profiles?.username || '匿名さん'}</p>
+                          <div className="flex justify-between items-baseline">
+                            <div>
+                              <p className="font-bold text-sm">{post.profiles?.username || '匿名さん'}</p>
+                              <p className="text-xs text-gray-400 mt-0.5 mb-[15px]">
+                                {post.profiles?.location || '未設定'} | {post.profiles?.age || '??'}歳
+                              </p>
+                            </div>
                             <p className="text-xs text-gray-500">
-                              {new Date(post.created_at).toLocaleString('ja-JP')}
+                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ja })}
                             </p>
                           </div>
                           <p className="mt-1 whitespace-pre-wrap break-words">{post.content}</p>
                         </div>
-                        <div className="mt-3 flex items-center justify-end gap-4">
+                        <div className="mt-3 flex items-center justify-between">
+                          {/* コメントアイコン */}
                           <button onClick={() => setCommentingPostId(commentingPostId === post.id ? null : post.id)} className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors">
                             <FaRegComment />
                             <span className="text-xs">{post.comments.length}</span>
                           </button>
-                          {user && user.id === post.user_id && (
-                              <button
-                                onClick={() => handleDelete(post.id)}
-                                className="delete-button"
-                                aria-label="投稿を削除"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                <span className="text-xs">削除</span>
-                              </button>
-                          )}
+
+                          {/* メニューボタン */}
+                          <div className="relative" ref={openMenuPostId === post.id ? menuRef : null}>
+                            <button onClick={() => setOpenMenuPostId(openMenuPostId === post.id ? null : post.id)} className="text-gray-400 hover:text-white transition-colors p-1 rounded-full">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                              </svg>
+                            </button>
+                            {/* ドロップダウンメニュー */}
+                            {openMenuPostId === post.id && (
+                              <div className="absolute right-0 mt-2 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 z-10">
+                                {user && user.id === post.user_id && (
+                                  <button onClick={() => { setOpenMenuPostId(null); handleDelete(post.id); }} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700">
+                                    削除
+                                  </button>
+                                )}
+                                <button onClick={() => { alert('この機能は現在準備中です。'); setOpenMenuPostId(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
+                                  通報
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -286,10 +319,8 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                       {/* コメント一覧 */}
                       <div className="space-y-3 mt-4 border-t border-gray-700 pt-4">
                         {post.comments.map(comment => (
-                          <div key={comment.id} className="flex items-start space-x-3">
-                            <Link href={`/profile/${comment.user_id}`} className="flex-shrink-0">
-                              <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={28}/>
-                            </Link>
+                          <div key={comment.id} className="flex items-start space-x-3 pl-2">
+                            <Link href={`/profile/${comment.user_id}`} className="flex-shrink-0"><AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={32}/></Link>
                             <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">
                               <p className="text-sm font-bold">{comment.profiles?.username || '匿名さん'}</p>
                               <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap break-words">{comment.content}</p>
@@ -390,7 +421,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
   let postsQuery = supabase
     .from('posts')
-    .select('*, profiles(username, avatar_url), comments(*, profiles(username, avatar_url))')
+    .select('*, profiles(username, avatar_url, location, age), comments(*, profiles(username, avatar_url))')
     .order('created_at', { ascending: false });
 
   if (blockedUserIdsArray.length > 0) {

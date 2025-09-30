@@ -59,7 +59,7 @@ const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error }) => {
                   href={`/chat/${room.id}`}
                   className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-700/60 transition-colors"
                 >
-                  <AvatarIcon avatarUrlPath={room.other_user.avatar_url} size={48} />
+                  <AvatarIcon avatarUrlPath={room.other_user.avatar_url} size={56} />
                   <div className="flex-1 overflow-hidden">
                     <div className="flex justify-between items-baseline">
                       <p className="font-bold text-white truncate">{room.other_user.username || '未設定'}</p>

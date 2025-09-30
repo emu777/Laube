@@ -9,6 +9,7 @@ type Profile = {
   avatar_url: string | null;
   location: string | null;
   age: number | null;
+  hobbies: string[] | null;
 }
 
 const ProfileCard = ({ profile }: { profile: Profile }) => {
@@ -39,12 +40,24 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
               <span className="text-gray-400">No image</span>
             </div>
           )}
+          {/* 名前 */}
+          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+            <p className="m-0 text-xs font-bold truncate text-white text-right">{profile.username || '未設定'}</p>
+          </div>
         </div>
         <div className="p-2.5 text-center">
-          <p className="m-0 text-sm font-bold truncate text-white">{profile.username || '未設定'}</p>
           <p className="m-0 text-xs text-gray-400">
             {profile.location || '未設定'}・{profile.age || '??'}歳
           </p>
+          {profile.hobbies && profile.hobbies.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1 justify-center">
+              {profile.hobbies.slice(0, 3).map(hobby => (
+                <span key={hobby} className="bg-gray-700/80 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full">
+                  {hobby}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Link>

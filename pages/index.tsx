@@ -18,6 +18,7 @@ type Profile = {
   location: string | null;
   age: number | null;
   last_seen: string | null;
+  hobbies: string[] | null;
 }
 
 type LikedByUser = {
@@ -67,7 +68,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
     let profilesQuery = supabase
       .from('profiles')
-      .select('id, username, avatar_url, location, age, last_seen')
+      .select('id, username, avatar_url, location, age, last_seen, hobbies')
       .neq('id', userId)
       .not('username', 'is', null);
     if (blockedUserIds.size > 0) {
@@ -148,8 +149,8 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
                   {likedByUsers.slice(0, 5).map(({ liker }) => {
                     if (!liker) return null;
                     return (
-                      <Link key={liker.id} href={`/profile/${liker.id}`}>
-                        <AvatarIcon avatarUrlPath={liker.avatar_url} size={32} />
+                      <Link key={liker.id} href={`/profile/${liker.id}`} className="transition-transform duration-200 hover:scale-110">
+                        <AvatarIcon avatarUrlPath={liker.avatar_url} size={40} />
                       </Link>
                     );
                   })}
@@ -164,9 +165,9 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
                   {likedByUsers.map(({ liker }) => {
                     if (!liker) return null;
                     return (
-                      <Link key={liker.id} href={`/profile/${liker.id}`} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-700/60 transition-colors text-center">
-                        <AvatarIcon avatarUrlPath={liker.avatar_url} size={48} />
-                        <span className="text-xs truncate text-white w-full">{liker.username || '未設定'}</span>
+                      <Link key={liker.id} href={`/profile/${liker.id}`} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-700/60 transition-colors text-center transition-transform duration-200 hover:scale-105">
+                        <AvatarIcon avatarUrlPath={liker.avatar_url} size={56} />
+                        <span className="text-sm truncate text-white w-full">{liker.username || '未設定'}</span>
                       </Link>
                     );
                   })}

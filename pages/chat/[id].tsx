@@ -129,7 +129,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <AvatarIcon avatarUrlPath={otherUser.avatar_url} size={36} />
+        <AvatarIcon avatarUrlPath={otherUser.avatar_url} size={40} />
         <h1 className="text-lg font-bold truncate">{otherUser.username || '未設定'}</h1>
       </header>
 
@@ -138,7 +138,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
           const isMe = message.sender_id === user?.id;
           return (
             <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-              {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={28} />}
+              {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
               <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${isMe ? 'bg-pink-600 rounded-br-md' : 'bg-gray-700 rounded-bl-md'}`}>
                 <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
               </div>

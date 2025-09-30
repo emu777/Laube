@@ -3,14 +3,14 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState } from 'react';
 import Link from 'next/link';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
+import PageLayout from '@/components/PageLayout';
 import {
   SwipeableList,
   SwipeableListItem,
   SwipeAction,
   TrailingActions,
+  useSwipeableList,
 } from 'react-swipeable-list';
 import 'react-swipeable-list/dist/styles.css';
 
@@ -29,13 +29,15 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
   const user = useUser();
   const [friendList, setFriendList] = useState(friends);
   const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
+  const { getSwipeableItemProps, parentSwipeableListProps } = useSwipeableList();
 
   const trailingActions = (friendId: string) => (
     <TrailingActions>
       <SwipeAction
         destructive={true}
         onClick={() => {
-          const friendToBlock = friendList.find(f => f.id === friendId);
+          parentSwipeableListProps.closeSwipedItem();
+          const friendToBlock = friendList.find((f) => f.id === friendId);
           if (friendToBlock) {
             setUserToBlock(friendToBlock);
           }
@@ -68,42 +70,37 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
-      <Header />
-      <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
-        <div className="w-full max-w-2xl mx-auto standalone:max-w-none standalone:px-4">
-          <h1 className="text-2xl font-bold mb-6">フレンド一覧</h1>
+    <PageLayout maxWidth="max-w-2xl">
+      <h1 className="text-2xl font-bold mb-6">フレンド一覧</h1>
 
-          {friendList.length > 0 ? (
-            <div>
-              <SwipeableList fullSwipe={false} destructiveCallbackDelay={300}>
-                {friendList.map((friend) => (
-                  <SwipeableListItem
-                    key={friend.id}
-                    trailingActions={trailingActions(friend.id)}
+      {friendList.length > 0 ? (
+        <div {...parentSwipeableListProps}>
+          <SwipeableList fullSwipe={false}>
+            {friendList.map((friend) => (
+              <SwipeableListItem
+                key={friend.id}
+                {...getSwipeableItemProps(friend.id)}
+                trailingActions={trailingActions(friend.id)}
+              >
+                <div className="border-b border-gray-700">
+                  <Link
+                    href={`/profile/${friend.id}`}
+                    className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
                   >
-                    <div className="border-b border-gray-700">
-                      <Link
-                        href={`/profile/${friend.id}`}
-                        className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
-                      >
-                        <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />
-                        <p className="font-bold text-white truncate flex-1">{friend.username || '未設定'}</p>
-                      </Link>
-                    </div>
-                  </SwipeableListItem>
-                ))}
-              </SwipeableList>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-gray-500">まだフレンドはいません。</p>
-              <p className="text-gray-500 text-sm mt-1">気になる人を見つけてマッチングしましょう！</p>
-            </div>
-          )}
+                    <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />
+                    <p className="font-bold text-white truncate flex-1">{friend.username || '未設定'}</p>
+                  </Link>
+                </div>
+              </SwipeableListItem>
+            ))}
+          </SwipeableList>
         </div>
-      </main>
-
+      ) : (
+        <div className="text-center py-12">
+          <p className="text-gray-500">まだフレンドはいません。</p>
+          <p className="text-gray-500 text-sm mt-1">気になる人を見つけてマッチングしましょう！</p>
+        </div>
+      )}
       {/* ブロック確認モーダル */}
       {userToBlock && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -113,15 +110,17 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
               {userToBlock.username}さんをブロックします。よろしいですか？
             </p>
             <div className="flex gap-4 pt-2">
-              <button onClick={() => setUserToBlock(null)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">いいえ</button>
-              <button onClick={handleBlockConfirm} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">はい</button>
+              <button onClick={() => setUserToBlock(null)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+                いいえ
+              </button>
+              <button onClick={handleBlockConfirm} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">
+                はい
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      <BottomNav />
-    </div>
+    </PageLayout>
   );
 };
 

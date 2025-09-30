@@ -22,7 +22,7 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
   return (
     <div className="relative">
       <div
-        className="rounded-full bg-gray-700 overflow-hidden border-2 border-gray-800"
+        className="rounded-full bg-gray-700 overflow-hidden border border-gray-800"
         style={{ width: size, height: size }}
       >
         {publicUrl ? (

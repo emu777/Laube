@@ -171,8 +171,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
-      <main className="p-4 pt-20 sm:pt-24 pb-24">
-        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6 relative pt-12 sm:pt-14">
+      <main className="p-4 pt-20 sm:pt-24 pb-32">
+        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl p-6 space-y-6 relative pt-12 sm:pt-14 pb-6">
           {/* 閉じるボタン */}
           <button onClick={() => router.back()} className="absolute top-2 right-2 sm:top-4 sm:right-4 rounded-full p-2 text-white transition-colors z-20" aria-label="閉じる">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -335,16 +335,29 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
             )}
           </div>
 
+          {/* フレンド状態のときに「トーク画面へ」ボタンを表示 */}
+          {isMatched && !isMyProfile && (
+            <div className="pt-4 px-8 mb-5">
+              <button onClick={createChatRoom} className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 transition-colors">
+                トーク画面へ
+              </button>
+            </div>
+          )}
+
           {/* マッチングボタン */}
           {isLikedBy && !isLiked && !isMyProfile && (
             <div className="pt-4 space-y-3">
               <p className="text-center text-pink-400 text-sm">相手はあなたに興味を持っています！</p>
-              <button onClick={handleMatch} className="w-full p-3 bg-gradient-to-r from-pink-500 to-orange-400 text-white font-bold rounded-lg hover:opacity-90 transition-opacity">
-                両想いになる
-              </button>
-              <button onClick={() => setShowRejectConfirm(true)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
-                拒否する
-              </button>
+              <div className="px-8 space-y-3 mb-5">
+                <button onClick={handleMatch} className="w-full p-3 bg-gradient-to-r from-pink-500 to-orange-400 text-white font-bold rounded-lg hover:opacity-90 transition-opacity">
+                  両想いになる
+                </button>
+                <div className="px-4">
+                  <button onClick={() => setShowRejectConfirm(true)} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+                    拒否する
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
