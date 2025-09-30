@@ -59,7 +59,7 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
       alert('ブロック処理に失敗しました。');
     } else {
       // UIからフレンドを削除
-      setFriendList(currentFriends => currentFriends.filter(f => f.id !== userToBlock.id));
+      setFriendList((currentFriends) => currentFriends.filter((f) => f.id !== userToBlock.id));
       alert(`${userToBlock.username}さんをブロックしました。`);
     }
     setUserToBlock(null);
@@ -72,7 +72,7 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
       {friendList.length > 0 ? (
         <div className="overflow-hidden">
           {friendList.map((friend) => (
-            <div key={friend.id} className="relative bg-gray-900">
+            <div key={friend.id} className="relative">
               {/* ブロックボタン (背景) */}
               <div className="absolute inset-y-0 right-0 bg-red-600 flex items-center justify-center px-6">
                 <span className="font-bold text-white">ブロック</span>
@@ -84,7 +84,10 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
                 style={{ transform: swipedItemId === friend.id ? 'translateX(-100px)' : 'translateX(0)' }}
                 onMouseDown={(e) => handleDragStart(e, friend.id)}
                 onMouseUp={(e) => handleDragEnd(e, friend)}
-                onTouchStart={(e) => { dragStartX.current = e.touches[0].clientX; setSwipedItemId(friend.id); }}
+                onTouchStart={(e) => {
+                  dragStartX.current = e.touches[0].clientX;
+                  setSwipedItemId(friend.id);
+                }}
                 onTouchEnd={(e) => {
                   const dragEndX = e.changedTouches[0].clientX;
                   const dragDistance = dragStartX.current - dragEndX;
@@ -93,7 +96,10 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
                   dragStartX.current = 0;
                 }}
               >
-                <Link href={`/profile/${friend.id}`} className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors">
+                <Link
+                  href={`/profile/${friend.id}`}
+                  className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
+                >
                   <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />
                   <p className="font-bold text-white truncate flex-1">{friend.username || '未設定'}</p>
                 </Link>
@@ -112,14 +118,18 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
             <h2 className="text-lg font-bold text-white">確認</h2>
-            <p className="text-sm text-gray-300">
-              {userToBlock.username}さんをブロックします。よろしいですか？
-            </p>
+            <p className="text-sm text-gray-300">{userToBlock.username}さんをブロックします。よろしいですか？</p>
             <div className="flex gap-4 pt-2">
-              <button onClick={handleBlockCancel} className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors">
+              <button
+                onClick={handleBlockCancel}
+                className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors"
+              >
                 いいえ
               </button>
-              <button onClick={handleBlockConfirm} className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors">
+              <button
+                onClick={handleBlockConfirm}
+                className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
+              >
                 はい
               </button>
             </div>
@@ -134,7 +144,9 @@ export default FriendsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createPagesServerClient(ctx);
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return { redirect: { destination: '/login', permanent: false } };
@@ -142,7 +154,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   // 自分が「いいね」したユーザーのIDリストを取得
   const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', session.user.id);
-  const myLikedUserIds = myLikes ? myLikes.map(like => like.liked_id) : [];
+  const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
 
   if (myLikedUserIds.length === 0) {
     return { props: { friends: [] } };
@@ -160,7 +172,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { props: { friends: [] } };
   }
 
-  const friendUserIds = friendLikeIds ? friendLikeIds.map(item => item.liker_id) : [];
+  const friendUserIds = friendLikeIds ? friendLikeIds.map((item) => item.liker_id) : [];
 
   if (friendUserIds.length === 0) {
     return { props: { friends: [] } };

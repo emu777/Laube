@@ -88,10 +88,16 @@ export default function MyApp({
       `}</style>
       <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
         <NotificationProvider>
-          {loading && <PageLoader />}
-          <DynamicPullToRefresh onRefresh={handleRefresh}>
-            <Component {...pageProps} />
-          </DynamicPullToRefresh>
+          <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+            <Header />
+            <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
+              {loading && <PageLoader />}
+              <DynamicPullToRefresh onRefresh={handleRefresh}>
+                <Component {...pageProps} />
+              </DynamicPullToRefresh>
+            </main>
+            <BottomNav />
+          </div>
         </NotificationProvider>
       </SessionContextProvider>
     </>

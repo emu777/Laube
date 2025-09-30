@@ -95,32 +95,30 @@ const ProfilePage: NextPage<{}> = () => {
   const createChatRoom = async () => {
     if (!user || !profile) return;
 
-    // To prevent duplicate rooms, always store the smaller ID in user1_id
     const user1 = user.id < profile.id ? user.id : profile.id;
     const user2 = user.id > profile.id ? user.id : profile.id;
 
-    const { data } = await supabase
+    // 1. 最初にチャットルームが存在するか確認
+    const { data: existingRoom } = await supabase
       .from('chat_rooms')
-      .insert({ user1_id: user1, user2_id: user2 })
-      .select()
-      .single()
-      .then(({ data: roomData, error: roomError }) => {
-        if (roomError && roomError.code !== '23505') throw roomError;
-        // If the room already exists, find it
-        return (
-          roomData ||
-          supabase
-            .from('chat_rooms')
-            .select('id')
-            .eq('user1_id', user1)
-            .eq('user2_id', user2)
-            .single()
-            .then((res) => res.data)
-        );
-      });
+      .select('id')
+      .eq('user1_id', user1)
+      .eq('user2_id', user2)
+      .single();
 
-    if (data?.id) {
-      router.push(`/chat/${data.id}`);
+    if (existingRoom) {
+      // 存在すれば、そのルームに遷移
+      router.push(`/chat/${existingRoom.id}`);
+    } else {
+      // 存在しなければ、新しく作成して遷移
+      const { data: newRoom, error: insertError } = await supabase
+        .from('chat_rooms')
+        .insert({ user1_id: user1, user2_id: user2 })
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+      if (newRoom) router.push(`/chat/${newRoom.id}`);
     }
   };
 
