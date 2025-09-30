@@ -336,7 +336,7 @@ const ProfilePage: NextPage<ProfilePageProps> = () => {
             <>
               <div className="border-t border-white/10 my-4" />
               <div className="flex flex-wrap gap-2 justify-center">
-                {profile.hobbies.map(hobby => (
+                {profile.hobbies.map((hobby: string) => (
                   <span key={hobby} className="bg-gray-700 text-gray-300 text-sm font-semibold px-3 py-1.5 rounded-full">{hobby}</span>
                 ))}
               </div>
