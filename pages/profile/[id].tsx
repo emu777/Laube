@@ -31,15 +31,18 @@ type ProfilePageProps = {
   isLiked: boolean
   isLikedBy: boolean
   isMyProfile: boolean
+  isMatched: boolean
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLiked, isLikedBy, isMyProfile, isMatched: initialIsMatched }) => {
   const supabase = useSupabaseClient()
   const user = useUser()
   const router = useRouter()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isLiked, setIsLiked] = useState(initialIsLiked)
+  const [isMatched, setIsMatched] = useState(initialIsMatched)
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     if (profile?.avatar_url) {
@@ -99,6 +102,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
 
         if (isLikedBy) { // 相手も自分をいいねしていたらマッチング成立
           await createChatRoom();
+          setIsMatched(true);
         }
       }
     }
@@ -109,6 +113,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     // 念のため、自分のいいねも作成する
     await supabase.from('likes').upsert({ liker_id: user.id, liked_id: profile.id });
     setIsLiked(true);
+    setIsMatched(true);
     await createChatRoom();
   };
 
@@ -167,15 +172,36 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
       <main className="p-4 pt-20 sm:pt-24 pb-24">
-        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6 relative">
+        <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl sm:p-6 space-y-6 relative pt-12 sm:pt-14">
           {/* 閉じるボタン */}
-          <button onClick={() => router.back()} className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-gray-700/80 rounded-full p-2 text-white hover:bg-gray-600/80 transition-colors z-10" aria-label="閉じる">
+          <button onClick={() => router.back()} className="absolute top-2 right-2 sm:top-4 sm:right-4 rounded-full p-2 text-white transition-colors z-20" aria-label="閉じる">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           <div className="w-full mx-auto aspect-[4/5] max-h-[500px] sm:max-h-[640px] sm:rounded-xl overflow-hidden shadow-lg">
             <div className="relative w-full h-full">
+              {/* メニューボタン */}
+              {!isMyProfile && (
+                <div className="absolute top-1 left-2 sm:top-2.5 sm:left-4 z-10">
+                  <button onClick={() => setShowMenu(!showMenu)} className="bg-gray-700/80 rounded-full p-2 text-white hover:bg-gray-600/80 transition-colors" aria-label="メニューを開く">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                  {/* ドロップダウンメニュー */}
+                  {showMenu && (
+                    <div className="absolute left-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 z-30">
+                      <button onClick={() => { setShowMenu(false); setShowRejectConfirm(true); }} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700">
+                        ブロックする
+                      </button>
+                      <button onClick={() => { alert('この機能は現在準備中です。'); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
+                        通報する
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               {avatarUrl ? (
                 <Image
                   src={avatarUrl}
@@ -219,16 +245,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
                 <div className="absolute bottom-4 right-4">
                   <button
                     onClick={handleLike}
-                    className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center border-4 border-gray-800 shadow-xl ${
-                      isLiked
-                        ? 'bg-pink-500 text-white'
-                        : 'bg-white text-pink-500 hover:bg-pink-50'
+                    disabled={isMatched}
+                    className={`rounded-full transition-all duration-300 ease-in-out transform active:scale-95 flex items-center justify-center gap-2 px-4 py-3 border-2 shadow-xl ${
+                      isMatched
+                        ? 'bg-green-500 text-white border-green-500 cursor-not-allowed'
+                        : isLiked
+                        ? 'bg-pink-500 text-white border-pink-500'
+                        : 'bg-white text-pink-500 border-white hover:bg-pink-50'
                     }`}
-                    aria-label={isLiked ? 'いいねを取り消す' : 'いいねする'}
+                    aria-label={isMatched ? 'フレンド' : (isLiked ? '「気になる」を取り消す' : '気になる')}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8"
+                      className="h-5 w-5"
                       fill={isLiked ? 'currentColor' : 'none'}
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -240,6 +269,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
                         d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z"
                       />
                     </svg>
+                    <span className="font-bold text-sm">{isMatched ? 'フレンド' : (isLiked ? '気になる済' : '気になる')}</span>
                   </button>
                 </div>
               )}
@@ -251,7 +281,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
               <div className="border-t border-white/10 my-4" />
               <div className="flex flex-wrap gap-2 justify-center">
                 {profile.hobbies.map(hobby => (
-                  <span key={hobby} className="bg-gray-700 text-gray-300 text-xs font-semibold px-2.5 py-1 rounded-full">{hobby}</span>
+                  <span key={hobby} className="bg-gray-700 text-gray-300 text-sm font-semibold px-3 py-1.5 rounded-full">{hobby}</span>
                 ))}
               </div>
             </>
@@ -266,41 +296,41 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, isLiked: initialIsLi
 
           <div className="border-t border-white/10 my-4" />
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <div className="flex flex-col items-center gap-y-3 text-sm max-w-md mx-auto px-4 pb-5">
             {profile.partner_status && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">恋人</span>
-                <span className="font-semibold text-white">{profile.partner_status}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">恋人 --</span>
+                <span className="font-semibold text-white ml-2">{profile.partner_status}</span>
               </div>
             )}
             {profile.marital_status && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">結婚・子供</span>
-                <span className="font-semibold text-white">{profile.marital_status}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">結婚・子供 --</span>
+                <span className="font-semibold text-white ml-2">{profile.marital_status}</span>
               </div>
             )}
             {profile.dating_experience && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">女性との交際歴</span>
-                <span className="font-semibold text-white">{profile.dating_experience}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">女性との交際歴 --</span>
+                <span className="font-semibold text-white ml-2">{profile.dating_experience}</span>
               </div>
             )}
             {profile.mbti && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">MBTI</span>
-                <span className="font-semibold text-white">{profile.mbti}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">MBTI --</span>
+                <span className="font-semibold text-white ml-2">{profile.mbti}</span>
               </div>
             )}
             {profile.drinking && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">お酒</span>
-                <span className="font-semibold text-white">{profile.drinking}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">お酒 --</span>
+                <span className="font-semibold text-white ml-2">{profile.drinking}</span>
               </div>
             )}
             {profile.smoking && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">タバコ</span>
-                <span className="font-semibold text-white">{profile.smoking}</span>
+              <div className="flex items-baseline">
+                <span className="text-gray-400">タバコ --</span>
+                <span className="font-semibold text-white ml-2">{profile.smoking}</span>
               </div>
             )}
           </div>
@@ -360,7 +390,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     .single()
 
   if (error || !profile) {    
-    return { props: { profile: null, isLiked: false, isLikedBy: false, isMyProfile: false } }
+    return { props: { profile: null, isLiked: false, isLikedBy: false, isMyProfile: false, isMatched: false } }
   }
 
   const isMyProfile = session.user.id === profile.id
@@ -385,7 +415,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     isLikedBy = (likedByCount ?? 0) > 0;
   }
 
+  const isMatched = isLiked && isLikedBy;
+
   return {
-    props: { profile, isLiked, isLikedBy, isMyProfile },
+    props: { profile, isLiked, isLikedBy, isMyProfile, isMatched },
   }
 }

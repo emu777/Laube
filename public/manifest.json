@@ -1,11 +1,11 @@
 {
   "name": "Laube",
   "short_name": "Laube",
-  "description": "A new dating app.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
-  "theme_color": "#db2777",
+  "theme_color": "#e11d48",
+  "description": "Laube - A new way to connect.",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",

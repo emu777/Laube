@@ -200,8 +200,8 @@ export default function Account({ profile }: AccountPageProps) {
   return (
     <div className="bg-gray-900 min-h-screen text-white">
       <Header />
-      <main className="p-4 pt-24 pb-24">
-        <div className="w-full max-w-2xl mx-auto space-y-8 standalone:max-w-none standalone:mx-0">
+      <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
+        <div className="w-full max-w-2xl mx-auto space-y-8 standalone:max-w-none standalone:px-4">
           <h1 className="text-center w-full text-2xl font-bold">マイプロフィール</h1>
 
           <div className="flex justify-center">

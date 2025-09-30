@@ -21,25 +21,37 @@ const Header = () => {
         </Link>
         <div className="relative z-30">
           <button onClick={() => setIsOpen(!isOpen)} className="bg-transparent border-none text-white cursor-pointer">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M3 6H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            {isOpen ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 12H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 6H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
           </button>
         </div>
       </header>
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-20 flex items-center justify-center" onClick={() => setIsOpen(false)}>
-          <div className="bg-gray-800 rounded-lg p-4 min-w-[250px] text-center" onClick={(e) => e.stopPropagation()}>
-            <ul className="list-none m-0 p-0 space-y-2">
+        <div className="fixed inset-0 bg-gray-900 z-30 pt-20 px-4">
+          <div className="w-full max-w-md mx-auto">
+            <ul className="list-none m-0 p-0 space-y-1">
               <li>
                 <Link href="/account" className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700" onClick={() => setIsOpen(false)}>
                   マイプロフ
                 </Link>
               </li>
               <li>
-                <button onClick={handleLogout} className="w-full bg-transparent border-none px-4 py-3 text-white text-center cursor-pointer hover:bg-gray-700 rounded">
+                <Link href="/friends" className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700" onClick={() => setIsOpen(false)}>
+                  フレンド一覧
+                </Link>
+              </li>
+              <li>
+                <button onClick={handleLogout} className="w-full text-left bg-transparent border-none px-4 py-3 text-red-400 cursor-pointer hover:bg-gray-700 rounded">
                   ログアウト
                 </button>
               </li>

@@ -137,8 +137,8 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
-      <main className="p-4 pt-24 pb-24">
-        <div className="w-full max-w-4xl mx-auto space-y-8">
+      <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
+        <div className="w-full max-w-4xl mx-auto space-y-8 standalone:max-w-none standalone:px-4">
           {/* あなたを気になっている人 */}
           {likedByUsers && likedByUsers.length > 0 ? (
             <div className="bg-gray-800/50 border border-gray-700/80 rounded-xl p-4">
@@ -179,7 +179,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
               <p>ユーザーを探しています...</p>
             </div>
           ) : (
-            <div className="flex flex-wrap justify-center gap-[15px]">
+            <div className="flex flex-wrap justify-start gap-[15px] w-fit mx-auto">
               {profiles?.map((profile) => <ProfileCard key={profile.id} profile={profile} />)}
             </div>
           )}
