@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSWRConfig } from 'swr';
 import { GetServerSidePropsContext } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
