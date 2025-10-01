@@ -3,6 +3,7 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 import AvatarIcon from '@/components/AvatarIcon';
+import useSWR, { useSWRConfig } from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FaHeart, FaComment, FaEnvelope } from 'react-icons/fa';
@@ -69,13 +70,19 @@ const getNotificationInfo = (notification: Notification) => {
   }
 };
 
-const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: initialNotifications }) => {
+const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: serverNotifications }) => {
   const supabase = useSupabaseClient();
   const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const { data: notifications } = useSWR('notifications', () => serverNotifications, {
+    fallbackData: serverNotifications,
+  });
 
   const handleNotificationClick = async (notification: Notification & { href: string }) => {
     if (!notification.is_read) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
+      // UIを即時更新
+      mutate('notifications');
     }
     // 通知を削除
     const { error: deleteError } = await supabase.from('notifications').delete().eq('id', notification.id);

@@ -1,31 +1,45 @@
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+
+workbox.setConfig({
+  debug: false,
+});
+
+// キャッシュ戦略
+workbox.routing.registerRoute(
+  ({ request }) => request.destination === 'script' || request.destination === 'style',
+  new workbox.strategies.StaleWhileRevalidate({
+    cacheName: 'static-resources',
+  })
+);
+
+workbox.routing.registerRoute(
+  ({ request }) => request.destination === 'image',
+  new workbox.strategies.CacheFirst({
+    cacheName: 'images',
+    plugins: [
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 60,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+      }),
+    ],
+  })
+);
+
+// プッシュ通知イベントのリスナー
 self.addEventListener('push', function (event) {
   const data = event.data.json();
   const options = {
     body: data.body,
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
-    tag: data.tag, // 同じタグの通知は上書きされる
-    data: {
-      href: data.href,
-    },
+    icon: '/icon-192x192.png',
+    badge: '/badge.png',
+    tag: data.tag,
+    data: { href: data.href },
   };
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
+// 通知クリックイベントのリスナー
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const href = event.notification.data.href || '/';
-  event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(function (clientList) {
-      for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i];
-        if (client.url === '/' && 'focus' in client) {
-          return client.focus().then((client) => client.navigate(href));
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(href);
-      }
-    })
-  );
+  event.waitUntil(clients.openWindow(event.notification.data.href || '/'));
 });
