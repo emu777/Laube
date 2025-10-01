@@ -6,8 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
-import { NotificationProvider } from '@/contexts/NotificationContext';
-import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
+import { NotificationProvider } from '../contexts/NotificationContext';
+import PullToRefresh from 'react-simple-pull-to-refresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -138,13 +138,13 @@ export default function MyApp({
               {loading ? (
                 <PageLoader />
               ) : (
-                <DynamicPullToRefresh onRefresh={handleRefresh}>
+                <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent={<PageLoader />}>
                   <Component {...pageProps} />
-                </DynamicPullToRefresh>
+                </PullToRefresh>
               )}
             </main>
-            {router.pathname.startsWith('/chat/') ? null : <BottomNav />}{' '}
-            {/* トーク詳細ページ(`/chat/[id]`)でのみBottomNavを非表示 */}
+            {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
+            {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>
         </NotificationProvider>
       </SessionContextProvider>
