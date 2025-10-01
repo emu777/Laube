@@ -139,7 +139,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
+      <main className="p-4">
         <div className="w-full max-w-4xl mx-auto space-y-8 standalone:max-w-none standalone:px-4">
           {/* あなたを気になっている人 */}
           {likedByUsers && likedByUsers.length > 0 ? (

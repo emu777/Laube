@@ -131,10 +131,15 @@ export default function MyApp({
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header /> {/* `Header`と`BottomNav`はページコンポーネントの外で一度だけ描画します */}
             <main className="pt-20 pb-24">
-              {loading && <PageLoader />}
-              <DynamicPullToRefresh onRefresh={handleRefresh}>
+              {loading ? (
+                <PageLoader />
+              ) : router.pathname.startsWith('/chat') ? (
                 <Component {...pageProps} />
-              </DynamicPullToRefresh>
+              ) : (
+                <DynamicPullToRefresh onRefresh={handleRefresh}>
+                  <Component {...pageProps} />
+                </DynamicPullToRefresh>
+              )}
             </main>
             <BottomNav />
           </div>
