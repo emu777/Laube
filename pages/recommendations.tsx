@@ -150,8 +150,9 @@ const RecommendationsPage: NextPage = () => {
 
           {/* 投稿一覧 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isLoading ? <p>読み込み中...</p> :
-              filteredRecommendations.map((rec) => {
+            {isLoading && <p>読み込み中...</p>}
+            {!isLoading &&
+              filteredRecommendations?.map((rec) => {
                 const videoId = getYouTubeVideoId(rec.youtube_url);
                 return videoId ? (
                   <div
@@ -200,7 +201,10 @@ const RecommendationsPage: NextPage = () => {
       {isFormOpen && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          role="button"
+          tabIndex={0}
           onClick={() => setIsFormOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsFormOpen(false)}
         >
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="space-y-4">
