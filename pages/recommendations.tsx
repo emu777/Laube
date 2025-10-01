@@ -79,15 +79,15 @@ const RecommendationsPage: NextPage = () => {
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {
-      alert('YouTubeのURLを入力してください。');
+      alert('オススメしたいYouTubeのURLを入力してください。');
       return;
     }
     if (!getYouTubeVideoId(newUrl)) {
-      alert('有効なYouTubeのURLを入力してください。');
+      alert('有効なYouTubeのURLを入力してください。（ショート動画は投稿出来ません）');
       return;
     }
     if (!newCategory) {
-      alert('カテゴリを選択してください。');
+      alert('動画のカテゴリを選択してください。');
       return;
     }
 
@@ -151,8 +151,7 @@ const RecommendationsPage: NextPage = () => {
           {/* 投稿一覧 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading && <p>読み込み中...</p>}
-            {error && <p className="text-red-400">読み込みに失敗しました。</p>}
-            {filteredRecommendations &&
+            {error && <p className="text-red-400">読み込みに失敗しました。</p>}{filteredRecommendations &&
               filteredRecommendations.map((rec) => {
                 const videoId = getYouTubeVideoId(rec.youtube_url);
                 return videoId ? (
