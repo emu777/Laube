@@ -139,9 +139,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <main className="p-4">
-        {' '}
-        {/* p-4を追加してコンテンツの左右に余白を確保 */}
+      <main>
         <div className="w-full max-w-4xl mx-auto space-y-8 standalone:max-w-none standalone:px-4">
           {/* あなたを気になっている人 */}
           {likedByUsers && likedByUsers.length > 0 ? (
