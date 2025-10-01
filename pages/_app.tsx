@@ -1,6 +1,7 @@
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider, Session, useUser } from '@supabase/auth-helpers-react';
 import { AppProps } from 'next/app';
+import { useSWRConfig } from 'swr';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
@@ -33,11 +34,14 @@ export default function MyApp({
   const user = useUser();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { mutate } = useSWRConfig();
 
   const handleRefresh = useCallback(() => {
-    router.replace(router.asPath);
+    // router.replace() の代わりに、SWRのキャッシュを再検証する
+    // これにより、どのページでもその場でデータが更新され、意図しないページ遷移がなくなる
+    mutate((key) => true, undefined, { revalidate: true });
     return Promise.resolve();
-  }, [router]);
+  }, [mutate]);
 
   // プッシュ通知の購読処理
   useEffect(() => {
