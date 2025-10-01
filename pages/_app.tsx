@@ -37,20 +37,11 @@ export default function MyApp({
   const { mutate } = useSWRConfig();
 
   const handleRefresh = useCallback(() => {
-    // getServerSidePropsを持つページではrouter.replaceを使い、それ以外ではSWRのmutateを使う
-    if (
-      pageProps.hasOwnProperty('isNewUser') ||
-      pageProps.hasOwnProperty('friends') ||
-      pageProps.hasOwnProperty('profile')
-    ) {
-      router.replace(router.asPath);
-    } else {
-      // クライアントサイドでデータを取得するページ（トーク、通知、タイムラインなど）
-      mutate((key) => true, undefined, { revalidate: true });
-    }
+    // router.replace() の代わりに、SWRのキャッシュを再検証する
+    // これにより、どのページでもその場でデータが更新され、意_app.tsxの意図しないページ遷移やレイアウト崩れがなくなる
+    mutate((key) => true, undefined, { revalidate: true });
     return Promise.resolve();
-    // pagePropsを依存配列に追加して、ページ遷移時に正しい更新関数が使われるようにする
-  }, [mutate, router, pageProps]);
+  }, [mutate]);
 
   // プッシュ通知の購読処理
   useEffect(() => {
