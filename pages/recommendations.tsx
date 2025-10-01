@@ -5,8 +5,6 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import useSWR from 'swr';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
 
 type Recommendation = {
@@ -128,8 +126,7 @@ const RecommendationsPage: NextPage = () => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <Header />
-      <main className="p-4 pt-24 pb-24">
+      <main className="p-4">
         <div className="w-full max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">オススメ</h1>
 
@@ -285,8 +282,6 @@ const RecommendationsPage: NextPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </button>
-
-      <BottomNav />
     </div>
   );
 };

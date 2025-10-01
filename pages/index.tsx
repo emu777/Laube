@@ -201,7 +201,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
               <p>ユーザーを探しています...</p>
             </div>
           ) : (
-            <div className="flex flex-wrap justify-center gap-[15px] w-fit mx-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {profiles?.map((profile) => (
                 <ProfileCard key={profile.id} profile={profile} />
               ))}

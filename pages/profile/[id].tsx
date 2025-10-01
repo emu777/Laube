@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
-import Header from '@/components/Header';
 import PageLoader from '@/components/PageLoader';
 const ProfilePage: NextPage = () => {
   const supabase = useSupabaseClient();
@@ -210,8 +209,7 @@ const ProfilePage: NextPage = () => {
   if (error || !profile) {
     return (
       <div className="bg-gray-900 min-h-screen text-white">
-        <Header />
-        <main className="p-4 pt-24 text-center">
+        <main className="p-4 text-center">
           <p>ユーザーが見つかりませんでした。</p>
           <button onClick={() => router.back()} className="mt-4 text-blue-400 hover:underline">
             一覧に戻る

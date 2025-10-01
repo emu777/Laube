@@ -130,7 +130,7 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header /> {/* `Header`と`BottomNav`はページコンポーネントの外で一度だけ描画します */}
-            <main className="p-4 pt-20 pb-24">
+            <main className="pt-20 pb-24">
               {loading && <PageLoader />}
               <DynamicPullToRefresh onRefresh={handleRefresh}>
                 <Component {...pageProps} />
