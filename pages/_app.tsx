@@ -136,6 +136,9 @@ export default function MyApp({
             <main className="pt-20 pb-24">
               {loading ? (
                 <PageLoader />
+              ) : router.pathname.startsWith('/profile/') || router.pathname === '/account' ? (
+                // プロフィールページではプルリフレッシュを無効化
+                <Component {...pageProps} />
               ) : (
                 <DynamicPullToRefresh onRefresh={handleRefresh}>
                   <Component {...pageProps} />
