@@ -363,24 +363,11 @@ export default function Account({ profile }: AccountPageProps) {
 
   return (
     <PageLayout maxWidth="max-w-2xl">
-      <div className="space-y-8">
-        <h1 className="text-center w-full text-2xl font-bold">マイプロフィール</h1>
-
-        <div className="flex justify-center">
-          <Avatar
-            uid={user.id}
-            url={avatar_url}
-            size={150}
-            onUpload={(url) => {
-              setAvatarUrl(url);
-              updateProfile({ avatar_url: url }, 'プロフィール画像を更新しました。');
-            }}
-          />
-        </div>
-
+      <div className="space-y-8 pb-10">
         {isSettingsPage ? (
           // 「設定」ページの場合
           <div className="bg-gray-800 rounded-xl p-6 space-y-6">
+            <h1 className="text-center w-full text-2xl font-bold">設定</h1>
             <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">通知設定</h2>
             <div className="flex items-center justify-between">
               <div>
@@ -758,6 +745,21 @@ export default function Account({ profile }: AccountPageProps) {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <button
+                onClick={handleUpdateProfile}
+                disabled={loading || isFormInvalid}
+                className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? '保存中...' : 'プロフィールを更新'}
+              </button>
+              <Link
+                href="/"
+                className="block w-full text-center bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg no-underline transition-colors"
+              >
+                戻る
+              </Link>
             </div>
           </form>
         )}

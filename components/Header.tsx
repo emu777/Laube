@@ -69,7 +69,7 @@ const Header = () => {
               </li>
               <li>
                 <Link
-                  href="/account" // 「設定」もアカウントページにリンクします
+                  href="/account?from=settings"
                   className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700"
                   onClick={() => setIsOpen(false)}
                 >

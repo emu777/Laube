@@ -93,17 +93,15 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
-            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <main className="pt-20 pb-24">
               {router.pathname.startsWith('/profile/') ? (
-                <main className="h-full overflow-y-auto">
-                  {loading ? <PageLoader /> : <Component {...pageProps} />}
-                </main>
+                <div className="h-full overflow-y-auto">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
               ) : (
                 <PullToRefresh onRefresh={handleRefresh}>
-                  <main className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
+                  <div className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
                 </PullToRefresh>
               )}
-            </div>
+            </main>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>

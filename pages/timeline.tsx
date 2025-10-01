@@ -135,11 +135,13 @@ const TimelinePage: NextPage = () => {
           .select('username, avatar_url, location, age')
           .eq('id', newPost.user_id)
           .single();
-        // 新しい投稿を既存のアイテムの先頭に追加する。mutateの第二引数をfalseにすることで、即時UI更新後に再検証を行わない
-        mutate(
-          (currentItems = []) => [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...currentItems],
-          false
-        );
+        mutate((currentItems = []) => {
+          // 既に同じ投稿が存在する場合は更新しない (重複表示を防ぐ)
+          if (currentItems.some((item) => item.id === newPost.id)) {
+            return currentItems;
+          }
+          return [{ ...newPost, profiles: profile, comments: [], item_type: 'post' }, ...currentItems];
+        }, false);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
         mutate((currentItems) => (currentItems || []).filter((item) => item.id !== payload.old.id), false);
