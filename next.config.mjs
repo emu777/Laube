@@ -1,12 +1,5 @@
 /** @type {import('next').NextConfig} */
-import pwa from 'next-pwa';
-
-const withPWA = pwa({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-});
+import withPWA from 'next-pwa';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -23,4 +16,13 @@ const nextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default withPWA({
+  ...nextConfig,
+  pwa: {
+    dest: 'public',
+    register: true,
+    skipWaiting: true,
+    swSrc: 'public/sw.js', // カスタムService Workerのソースファイルを指定
+    disable: process.env.NODE_ENV === 'development',
+  },
+});

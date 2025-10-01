@@ -1,45 +1,53 @@
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+if (typeof self === 'undefined') {
+  // This file is not a service worker, so do nothing.
+} else {
+  // workbox-sw.jsをインポートします。next-pwaがパスを解決します。
+  importScripts('workbox-sw.js');
 
-workbox.setConfig({
-  debug: false,
-});
+  // next-pwaが生成するプリキャッシュマニフェストを挿入します。
+  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
 
-// キャッシュ戦略
-workbox.routing.registerRoute(
-  ({ request }) => request.destination === 'script' || request.destination === 'style',
-  new workbox.strategies.StaleWhileRevalidate({
-    cacheName: 'static-resources',
-  })
-);
+  workbox.setConfig({
+    debug: false,
+  });
 
-workbox.routing.registerRoute(
-  ({ request }) => request.destination === 'image',
-  new workbox.strategies.CacheFirst({
-    cacheName: 'images',
-    plugins: [
-      new workbox.expiration.ExpirationPlugin({
-        maxEntries: 60,
-        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
-      }),
-    ],
-  })
-);
+  // キャッシュ戦略
+  workbox.routing.registerRoute(
+    ({ request }) => request.destination === 'script' || request.destination === 'style',
+    new workbox.strategies.StaleWhileRevalidate({
+      cacheName: 'static-resources',
+    })
+  );
 
-// プッシュ通知イベントのリスナー
-self.addEventListener('push', function (event) {
-  const data = event.data.json();
-  const options = {
-    body: data.body,
-    icon: '/icon-192x192.png',
-    badge: '/badge.png',
-    tag: data.tag,
-    data: { href: data.href },
-  };
-  event.waitUntil(self.registration.showNotification(data.title, options));
-});
+  workbox.routing.registerRoute(
+    ({ request }) => request.destination === 'image',
+    new workbox.strategies.CacheFirst({
+      cacheName: 'images',
+      plugins: [
+        new workbox.expiration.ExpirationPlugin({
+          maxEntries: 60,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+        }),
+      ],
+    })
+  );
 
-// 通知クリックイベントのリスナー
-self.addEventListener('notificationclick', function (event) {
-  event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.href || '/'));
-});
+  // プッシュ通知イベントのリスナー
+  self.addEventListener('push', function (event) {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: '/icon-192x192.png',
+      badge: '/badge.png',
+      tag: data.tag,
+      data: { href: data.href },
+    };
+    event.waitUntil(self.registration.showNotification(data.title, options));
+  });
+
+  // 通知クリックイベントのリスナー
+  self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    event.waitUntil(clients.openWindow(event.notification.data.href || '/'));
+  });
+}

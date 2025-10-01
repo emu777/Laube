@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
+import PullToRefresh from '@/components/PullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -132,16 +132,12 @@ export default function MyApp({
       <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-            <Header />
-            <main className="pt-20 pb-24">
-              {loading ? (
-                <PageLoader />
-              ) : (
-                <DynamicPullToRefresh onRefresh={handleRefresh}>
-                  <Component {...pageProps} />
-                </DynamicPullToRefresh>
-              )}
-            </main>
+            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto">
+              <PullToRefresh onRefresh={handleRefresh}>
+                <Header />
+                <main className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
+              </PullToRefresh>
+            </div>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>

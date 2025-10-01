@@ -79,14 +79,29 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
   });
 
   const handleNotificationClick = async (notification: Notification & { href: string }) => {
-    if (!notification.is_read) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
-      // UIを即時更新
-      mutate('notifications');
-    }
-    // 通知を削除
-    const { error: deleteError } = await supabase.from('notifications').delete().eq('id', notification.id);
-    if (deleteError) console.error('Error deleting notification:', deleteError);
+    // 楽観的UI更新: クリックされた通知をリストから即座に削除
+    mutate(
+      (currentNotifications: DisplayNotification[] | undefined) =>
+        (currentNotifications || []).filter((n) => n.id !== notification.id),
+      false // 再検証はしない
+    );
+
+    // サーバー側で既読更新と削除を非同期で実行
+    (async () => {
+      if (!notification.is_read) {
+        const { error: updateError } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('id', notification.id);
+        if (updateError) console.error('Error updating notification:', updateError);
+      }
+      const { error: deleteError } = await supabase.from('notifications').delete().eq('id', notification.id);
+      if (deleteError) {
+        console.error('Error deleting notification:', deleteError);
+        // 削除に失敗した場合、キャッシュを再検証してUIを元に戻す
+        mutate('notifications');
+      }
+    })();
 
     router.push(notification.href);
   };

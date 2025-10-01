@@ -225,7 +225,7 @@ const ProfilePage: NextPage = () => {
         <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl p-6 space-y-6 relative pt-12 sm:pt-14 pb-6">
           {/* 閉じるボタン */}
           <button
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               router.back();
             }}
