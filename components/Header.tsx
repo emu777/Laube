@@ -55,7 +55,7 @@ const Header = () => {
         </div>
       </header>
       {isOpen && (
-        <div className="fixed inset-0 bg-gray-900 z-30 pt-20 px-4">
+        <div className="fixed inset-0 bg-gray-900 z-50 pt-20 px-4">
           <div className="w-full max-w-md mx-auto">
             <ul className="list-none m-0 p-0 space-y-1">
               <li>
@@ -91,7 +91,7 @@ const Header = () => {
 
       {/* ログアウト確認モーダル */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
             <h2 className="text-lg font-bold text-white">確認</h2>
             <p className="text-sm text-gray-300">ログアウトしますか？</p>

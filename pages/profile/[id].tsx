@@ -225,7 +225,10 @@ const ProfilePage: NextPage = () => {
         <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl p-6 space-y-6 relative pt-12 sm:pt-14 pb-6">
           {/* 閉じるボタン */}
           <button
-            onClick={() => router.back()}
+            onClick={(e) => {
+              e.stopPropagation();
+              router.back();
+            }}
             className="absolute top-2 right-2 sm:top-4 sm:right-4 rounded-full p-2 text-white transition-colors z-20"
             aria-label="閉じる"
           >

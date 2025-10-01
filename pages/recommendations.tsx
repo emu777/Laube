@@ -156,7 +156,7 @@ const RecommendationsPage: NextPage = () => {
                     key={rec.id}
                     className="bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden shadow-md"
                   >
-                    <div className="aspect-video">
+                    <div className="aspect-video relative">
                       <iframe
                         width="100%"
                         height="100%"
@@ -166,6 +166,8 @@ const RecommendationsPage: NextPage = () => {
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       ></iframe>
+                      {/* iframeがスクロールイベントを奪うのを防ぐためのオーバーレイ */}
+                      <div className="absolute inset-0"></div>
                     </div>
                     <div className="p-4">
                       {rec.category && (

@@ -6,8 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
-import { NotificationProvider } from '@/contexts/NotificationContext';
-import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
+import { NotificationProvider } from '../contexts/NotificationContext';
+import { usePullToRefresh } from 'pull-to-refresh-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -36,10 +36,13 @@ export default function MyApp({
   const router = useRouter();
   const { mutate } = useSWRConfig();
 
-  const handleRefresh = useCallback(async () => {
-    // SWRのキャッシュを再検証する
+  const handleRefresh = useCallback(() => {
+    // SWRのキャッシュを再検証する。これにより、どのページでもその場でデータが更新される
     mutate((key) => true, undefined, { revalidate: true });
+    return Promise.resolve();
   }, [mutate]);
+
+  const { isRefreshing } = usePullToRefresh({ onRefresh: handleRefresh });
 
   // プッシュ通知の購読処理
   useEffect(() => {
@@ -132,15 +135,8 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
-            <main className="pt-20 pb-24">
-              {loading ? (
-                <PageLoader />
-              ) : (
-                <DynamicPullToRefresh onRefresh={handleRefresh}>
-                  <Component {...pageProps} />
-                </DynamicPullToRefresh>
-              )}
-            </main>
+            {isRefreshing && <PageLoader />}
+            <main className="pt-20 pb-24">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>
