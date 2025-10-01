@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
+import PullToRefresh from '@/components/PullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -93,18 +93,17 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
-            <main className="pt-20 pb-24">
-              {loading ? (
-                <PageLoader />
-              ) : router.pathname.startsWith('/profile/') ? (
-                // プロフィール詳細ページではプルリフレッシュを無効化
-                <Component {...pageProps} />
+            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {router.pathname.startsWith('/profile/') ? (
+                <main className="h-full overflow-y-auto">
+                  {loading ? <PageLoader /> : <Component {...pageProps} />}
+                </main>
               ) : (
-                <DynamicPullToRefresh onRefresh={handleRefresh}>
-                  <Component {...pageProps} />
-                </DynamicPullToRefresh>
+                <PullToRefresh onRefresh={handleRefresh}>
+                  <main className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
+                </PullToRefresh>
               )}
-            </main>
+            </div>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>

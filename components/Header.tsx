@@ -55,7 +55,7 @@ const Header = () => {
         </div>
       </header>
       {isOpen && (
-        <div className="fixed inset-0 bg-gray-900 z-50 pt-20 px-4">
+        <div className="fixed inset-0 bg-gray-900 z-30 pt-20 px-4">
           <div className="w-full max-w-md mx-auto">
             <ul className="list-none m-0 p-0 space-y-1">
               <li>
@@ -65,6 +65,15 @@ const Header = () => {
                   onClick={() => setIsOpen(false)}
                 >
                   マイプロフ
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/account" // 「設定」もアカウントページにリンクします
+                  className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700"
+                  onClick={() => setIsOpen(false)}
+                >
+                  設定
                 </Link>
               </li>
               <li>
