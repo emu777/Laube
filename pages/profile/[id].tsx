@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import PageLoader from '@/components/PageLoader';
 const ProfilePage: NextPage = () => {
   const supabase = useSupabaseClient();
@@ -224,7 +223,6 @@ const ProfilePage: NextPage = () => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <Header />
       <main className="p-4 pt-20 sm:pt-24 pb-32">
         <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl p-6 space-y-6 relative pt-12 sm:pt-14 pb-6">
           {/* 閉じるボタン */}
@@ -488,8 +486,6 @@ const ProfilePage: NextPage = () => {
           </div>
         </div>
       )}
-
-      {/* いいね解除確認モーダル */}
       {showUnlikeConfirm && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
@@ -512,8 +508,6 @@ const ProfilePage: NextPage = () => {
           </div>
         </div>
       )}
-
-      <BottomNav />
     </div>
   );
 };

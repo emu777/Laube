@@ -1,14 +1,12 @@
-import { GetServerSidePropsContext, NextPage } from 'next'
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
+import { GetServerSidePropsContext, NextPage } from 'next';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import useSWR from 'swr';
-import Header from '@/components/Header'
-import ProfileCard from '@/components/ProfileCard'
-import BottomNav from '@/components/BottomNav'
-import AvatarIcon from '@/components/AvatarIcon'
+import ProfileCard from '@/components/ProfileCard';
+import AvatarIcon from '@/components/AvatarIcon';
 
 // プロフィールデータの型を定義します
 type Profile = {
@@ -20,7 +18,7 @@ type Profile = {
   last_seen: string | null;
   hobbies: string[] | null;
   bio: string | null;
-}
+};
 
 type LikedByUser = {
   created_at: string;
@@ -33,7 +31,7 @@ type LikedByUser = {
 
 type HomePageProps = {
   isNewUser: boolean;
-}
+};
 
 const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   const router = useRouter();
@@ -116,14 +114,17 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     if (!likesData) return [];
 
     // 5. 取得したIDを元に、ユーザーのプロフィール情報を取得
-    const likerIds = likesData.map(like => like.liker_id);
-    const { data: profilesData, error: profilesError } = await supabase.from('profiles').select('id, username, avatar_url').in('id', likerIds);
+    const likerIds = likesData.map((like) => like.liker_id);
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', likerIds);
     if (profilesError) throw profilesError;
 
     // 6. 「いいね」情報とプロフィール情報を結合して返す
-    return likesData.map(like => ({
+    return likesData.map((like) => ({
       created_at: like.created_at,
-      liker: profilesData.find(p => p.id === like.liker_id) || null,
+      liker: profilesData.find((p) => p.id === like.liker_id) || null,
     }));
   };
 
@@ -138,7 +139,6 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <Header />
       <main className="p-4 pt-24 pb-24 standalone:p-0 standalone:pt-24 standalone:pb-24">
         <div className="w-full max-w-4xl mx-auto space-y-8 standalone:max-w-none standalone:px-4">
           {/* あなたを気になっている人 */}
@@ -150,15 +150,31 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
                   {likedByUsers.slice(0, 5).map(({ liker }) => {
                     if (!liker) return null;
                     return (
-                      <Link key={liker.id} href={`/profile/${liker.id}`} className="transition-transform duration-200 hover:scale-110">
+                      <Link
+                        key={liker.id}
+                        href={`/profile/${liker.id}`}
+                        className="transition-transform duration-200 hover:scale-110"
+                      >
                         <AvatarIcon avatarUrlPath={liker.avatar_url} size={40} />
                       </Link>
                     );
                   })}
                 </div>
-                <button onClick={() => setShowAllLikedBy(!showAllLikedBy)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0">
+                <button
+                  onClick={() => setShowAllLikedBy(!showAllLikedBy)}
+                  className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0"
+                >
                   <span className="w-12 text-center">もっと見る</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${showAllLikedBy ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-4 w-4 transition-transform ${showAllLikedBy ? 'rotate-90' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
               {showAllLikedBy && (
@@ -166,7 +182,11 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
                   {likedByUsers.map(({ liker }) => {
                     if (!liker) return null;
                     return (
-                      <Link key={liker.id} href={`/profile/${liker.id}`} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-700/60 transition-colors text-center transition-transform duration-200 hover:scale-105">
+                      <Link
+                        key={liker.id}
+                        href={`/profile/${liker.id}`}
+                        className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-700/60 transition-colors text-center transition-transform duration-200 hover:scale-105"
+                      >
                         <AvatarIcon avatarUrlPath={liker.avatar_url} size={56} />
                         <span className="text-sm truncate text-white w-full">{liker.username || '未設定'}</span>
                       </Link>
@@ -182,7 +202,9 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
             </div>
           ) : (
             <div className="flex flex-wrap justify-center gap-[15px] w-fit mx-auto">
-              {profiles?.map((profile) => <ProfileCard key={profile.id} profile={profile} />)}
+              {profiles?.map((profile) => (
+                <ProfileCard key={profile.id} profile={profile} />
+              ))}
             </div>
           )}
         </div>
@@ -198,31 +220,58 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
             </p>
             <div className="text-left text-xs bg-gray-700 p-3 rounded-lg text-gray-400 space-y-2">
               <p>
-                <span className="font-bold text-white">iOS (Safari):</span><br />
-                画面下の共有アイコン <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block -mt-1" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" /></svg> をタップし、「ホーム画面に追加」を選択してください。
+                <span className="font-bold text-white">iOS (Safari):</span>
+                <br />
+                画面下の共有アイコン{' '}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 inline-block -mt-1"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                </svg>{' '}
+                をタップし、「ホーム画面に追加」を選択してください。
               </p>
               <p>
-                <span className="font-bold text-white">Android (Chrome):</span><br />
-                右上のメニュー <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block -mt-1" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" clipRule="evenodd" /></svg> をタップし、「ホーム画面に追加」または「アプリをインストール」を選択してください。
+                <span className="font-bold text-white">Android (Chrome):</span>
+                <br />
+                右上のメニュー{' '}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 inline-block -mt-1"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+                    clipRule="evenodd"
+                  />
+                </svg>{' '}
+                をタップし、「ホーム画面に追加」または「アプリをインストール」を選択してください。
               </p>
             </div>
-            <button onClick={handleCloseModalAndRedirect} className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 transition-colors">
+            <button
+              onClick={handleCloseModalAndRedirect}
+              className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 transition-colors"
+            >
               次へ進む
             </button>
           </div>
         </div>
       )}
-
-      <BottomNav />
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createPagesServerClient(ctx);
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return { redirect: { destination: '/login', permanent: false } };
@@ -239,5 +288,5 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     props: {
       isNewUser: !userProfile?.username,
     },
-  }
-}
+  };
+};
