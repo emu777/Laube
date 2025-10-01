@@ -2,8 +2,6 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 import Link from 'next/link';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
 import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
@@ -64,9 +62,8 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
   if (!user) return null;
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
-      <Header />
-      <main className="p-4 pt-24 pb-24">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+      <main className="p-4">
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">トーク</h1>
 
@@ -120,7 +117,6 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
           )}
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };
@@ -129,14 +125,15 @@ export default ChatPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createPagesServerClient(ctx);
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
   return {
-    props: {
-    },
+    props: {},
   };
 };

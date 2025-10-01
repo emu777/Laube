@@ -2,8 +2,6 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import AvatarIcon from '@/components/AvatarIcon';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -77,28 +75,21 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
 
   const handleNotificationClick = async (notification: Notification & { href: string }) => {
     if (!notification.is_read) {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notification.id);
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
     }
     // 通知を削除
-    const { error: deleteError } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', notification.id);
+    const { error: deleteError } = await supabase.from('notifications').delete().eq('id', notification.id);
     if (deleteError) console.error('Error deleting notification:', deleteError);
 
     router.push(notification.href);
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
-      <Header />
-      <main className="p-4 pt-24 pb-24">
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+      <main className="p-4">
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">通知</h1>
-          
+
           {initialNotifications.length > 0 ? (
             <div className="space-y-2">
               {initialNotifications.map((notification) => {
@@ -107,7 +98,7 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
                   const latestSender = notification.sender;
                   const otherSendersCount = notification.count > 1 ? notification.count - 1 : 0; // 1件の場合は「他0人」と表示しない
                   const message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}があなたの事を気になっています`;
-                  const isUnread = notification.senders.some(s => !s.is_read);
+                  const isUnread = notification.senders.some((s) => !s.is_read);
 
                   return (
                     <div
@@ -119,12 +110,14 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
                     >
                       <div className="relative flex -space-x-4">
                         {notification.senders.slice(0, 3).map((sender, index) => (
-                           <AvatarIcon key={sender?.id || index} avatarUrlPath={sender?.avatar_url} size={40} />
+                          <AvatarIcon key={sender?.id || index} avatarUrlPath={sender?.avatar_url} size={40} />
                         ))}
                       </div>
                       <div className="flex-1 overflow-hidden">
                         {isUnread && (
-                          <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">New</span>
+                          <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">
+                            New
+                          </span>
                         )}
                         <p className="text-sm text-gray-300">{message}</p>
                         <div className="flex items-center gap-2 mt-1">
@@ -133,7 +126,9 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
                           </p>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">{icon}</div>
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">
+                        {icon}
+                      </div>
                     </div>
                   );
                 }
@@ -150,17 +145,21 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
                   >
                     <AvatarIcon avatarUrlPath={notification.sender?.avatar_url} size={40} />
                     <div className="flex-1 overflow-hidden">
-                       {!notification.is_read && (
-                         <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">New</span>
-                       )}
-                       <p className="text-sm text-gray-300">{message}</p>
-                       <div className="flex items-center gap-2 mt-1">
-                         <p className="text-xs text-gray-500">
-                           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ja })}
-                         </p>
-                       </div>
+                      {!notification.is_read && (
+                        <span className="text-xs font-bold text-pink-400 bg-pink-900/40 px-2 py-0.5 rounded-full mb-1 inline-block">
+                          New
+                        </span>
+                      )}
+                      <p className="text-sm text-gray-300">{message}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-500">
+                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ja })}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">{icon}</div>
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700">
+                      {icon}
+                    </div>
                   </div>
                 );
               })}
@@ -172,7 +171,6 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: in
           )}
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };
@@ -181,7 +179,9 @@ export default NotificationsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createPagesServerClient(ctx);
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return { redirect: { destination: '/login', permanent: false } };
@@ -201,7 +201,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const commentGroups: { [key: string]: Notification[] } = {};
 
   // 通知を種類ごとに分類
-  (notifications || []).forEach(n => {
+  (notifications || []).forEach((n) => {
     if (n.type === 'like') {
       likeGroup.push(n);
     } else if (n.type === 'message') {
@@ -222,22 +222,31 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
       ...latest,
       is_grouped: true,
       count: likeGroup.length,
-      senders: likeGroup.map(n => n.sender ? { ...n.sender, is_read: n.is_read } : null).filter(Boolean) as GroupedNotification['senders'],
+      senders: likeGroup
+        .map((n) => (n.sender ? { ...n.sender, is_read: n.is_read } : null))
+        .filter(Boolean) as GroupedNotification['senders'],
     });
   }
 
   // コメントを投稿ごとにグループ化
-  Object.values(commentGroups).forEach(group => {
+  Object.values(commentGroups).forEach((group) => {
     if (group.length > 1) {
       const latest = group[0];
-      groupedNotifications.push({ ...latest, is_grouped: true, count: group.length, senders: group.map(n => n.sender ? { ...n.sender, is_read: n.is_read } : null).filter(Boolean) as GroupedNotification['senders'] });
+      groupedNotifications.push({
+        ...latest,
+        is_grouped: true,
+        count: group.length,
+        senders: group
+          .map((n) => (n.sender ? { ...n.sender, is_read: n.is_read } : null))
+          .filter(Boolean) as GroupedNotification['senders'],
+      });
     } else {
       groupedNotifications.push(group[0]);
     }
   });
 
   // トークは送信者ごとに最新の1件のみ表示
-  Object.values(messageGroups).forEach(group => groupedNotifications.push(group[0]));
+  Object.values(messageGroups).forEach((group) => groupedNotifications.push(group[0]));
 
   // 最新順にソート
   groupedNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
