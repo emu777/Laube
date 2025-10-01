@@ -97,9 +97,9 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">通知</h1>
 
-          {initialNotifications.length > 0 ? (
+          {notifications && notifications.length > 0 ? (
             <div className="space-y-2">
-              {initialNotifications.map((notification) => {
+              {notifications.map((notification) => {
                 if (isGroupedNotification(notification)) {
                   const { icon, href } = getNotificationInfo(notification);
                   const latestSender = notification.sender;
