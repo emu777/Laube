@@ -1,11 +1,11 @@
 if (typeof self === 'undefined') {
   // This file is not a service worker, so do nothing.
 } else {
-  // workbox-sw.jsをインポートします。next-pwaがパスを解決します。
-  importScripts('workbox-sw.js');
+  // workbox-sw.jsをインポートします。next-pwaがビルド時に正しいパスに置き換えます。
+  self.importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
 
   // next-pwaが生成するプリキャッシュマニフェストを挿入します。
-  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
+  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
   workbox.setConfig({
     debug: false,

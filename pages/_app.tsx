@@ -132,9 +132,9 @@ export default function MyApp({
       <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto">
+            <Header />
+            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
               <PullToRefresh onRefresh={handleRefresh}>
-                <Header />
                 <main className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
               </PullToRefresh>
             </div>
