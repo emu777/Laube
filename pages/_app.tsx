@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import PullToRefresh from '@/components/PullToRefresh';
+import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -40,46 +40,6 @@ export default function MyApp({
     // SWRのキャッシュを再検証する
     mutate((key) => true, undefined, { revalidate: true });
   }, [mutate]);
-
-  // プッシュ通知の購読処理
-  useEffect(() => {
-    const setupPushNotifications = async () => {
-      if ('serviceWorker' in navigator && 'PushManager' in window && user) {
-        try {
-          // `next-pwa`が自動でsw.jsを登録するため、手動の登録は不要
-          const registration = await navigator.serviceWorker.ready;
-
-          // 既に購読済みか確認
-          let subscription = await registration.pushManager.getSubscription();
-
-          if (!subscription) {
-            // 購読していない場合は、許可を求めて購読する
-            const permission = await window.Notification.requestPermission();
-            if (permission !== 'granted') {
-              console.log('Push notification permission not granted.');
-              return;
-            }
-
-            subscription = await registration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-            });
-          }
-
-          // 購読情報をSupabaseに保存
-          await supabaseClient
-            .from('push_subscriptions')
-            .upsert({ user_id: user.id, subscription: subscription }, { onConflict: 'user_id,subscription' });
-        } catch (error) {
-          console.error('Error setting up push notifications:', error);
-        }
-      }
-    };
-
-    if (user) {
-      setupPushNotifications();
-    }
-  }, [user, supabaseClient]);
 
   useEffect(() => {
     const handleStart = () => setLoading(true);
@@ -133,11 +93,18 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
-            <div className="fixed inset-0 pt-20 pb-24 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <PullToRefresh onRefresh={handleRefresh}>
-                <main className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
-              </PullToRefresh>
-            </div>
+            <main className="pt-20 pb-24">
+              {loading ? (
+                <PageLoader />
+              ) : router.pathname.startsWith('/profile/') ? (
+                // プロフィール詳細ページではプルリフレッシュを無効化
+                <Component {...pageProps} />
+              ) : (
+                <DynamicPullToRefresh onRefresh={handleRefresh}>
+                  <Component {...pageProps} />
+                </DynamicPullToRefresh>
+              )}
+            </main>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>

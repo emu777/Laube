@@ -158,6 +158,7 @@ const RecommendationsPage: NextPage = () => {
                   >
                     <div className="aspect-video relative">
                       <iframe
+                        className="pointer-events-none"
                         width="100%"
                         height="100%"
                         src={`https://www.youtube.com/embed/${videoId}`}
@@ -166,8 +167,6 @@ const RecommendationsPage: NextPage = () => {
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       ></iframe>
-                      {/* iframeがスクロールイベントを奪うのを防ぐためのオーバーレイ */}
-                      <div className="absolute inset-0"></div>
                     </div>
                     <div className="p-4">
                       {rec.category && (

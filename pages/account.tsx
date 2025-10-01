@@ -54,6 +54,8 @@ export default function Account({ profile }: AccountPageProps) {
   const [mbti, setMbti] = useState<Profile['mbti']>(profile.mbti || '');
 
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const isFormInvalid = useMemo(() => {
     return (
@@ -73,7 +75,12 @@ export default function Account({ profile }: AccountPageProps) {
 
   useEffect(() => {
     setLoading(false);
+    if ('Notification' in window) {
+      setNotificationPermission(window.Notification.permission);
+    }
   }, []);
+
+  // (ここに `handleNotificationToggle` 関数を追加します)
 
   async function updateProfile(
     {
@@ -167,6 +174,54 @@ export default function Account({ profile }: AccountPageProps) {
         return prevSexualities.filter((item) => item !== value);
       }
     });
+  };
+
+  const handleNotificationToggle = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !user) {
+      alert('お使いのブラウザはプッシュ通知に対応していません。');
+      return;
+    }
+
+    setIsSubscribing(true);
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const currentSubscription = await registration.pushManager.getSubscription();
+
+      if (currentSubscription) {
+        // --- 購読解除処理 ---
+        await currentSubscription.unsubscribe();
+        await supabase.from('push_subscriptions').delete().match({ subscription: currentSubscription });
+        setNotificationPermission('default'); // or 'prompt'
+        alert('通知をオフにしました。');
+      } else {
+        // --- 購読処理 ---
+        const permission = await window.Notification.requestPermission();
+        setNotificationPermission(permission);
+
+        if (permission === 'granted') {
+          const newSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+          });
+          await supabase
+            .from('push_subscriptions')
+            .upsert({ user_id: user.id, subscription: newSubscription }, { onConflict: 'user_id,subscription' });
+          alert('通知をオンにしました！');
+        } else if (permission === 'denied') {
+          alert(
+            '通知がブロックされています。ブラウザの設定からこのサイトの通知を許可してください。\n\n【設定変更の方法】\nアドレスバーの左側にある鍵マーク(🔒)をクリックし、通知を「許可」に変更してください。'
+          );
+        } else {
+          alert('通知の許可が保留されました。');
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling push notifications:', error);
+      alert('通知設定の変更中にエラーが発生しました。');
+    } finally {
+      setIsSubscribing(false);
+    }
   };
 
   const handleHobbyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -658,6 +713,43 @@ export default function Account({ profile }: AccountPageProps) {
           </div>
 
           {/* アカウント */}
+          <div className="bg-gray-800 rounded-xl p-6 space-y-6">
+            <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">通知設定</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">プッシュ通知</p>
+                <p className="text-sm text-gray-400">
+                  {notificationPermission === 'granted'
+                    ? '新しい「いいね」やメッセージを即時にお知らせします。'
+                    : notificationPermission === 'denied'
+                      ? '通知はブロックされています。'
+                      : '通知はオフになっています。'}
+                </p>
+              </div>
+              <button
+                onClick={handleNotificationToggle}
+                disabled={isSubscribing || notificationPermission === 'denied'}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  notificationPermission === 'granted'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-pink-600 hover:bg-pink-700 text-white'
+                }`}
+              >
+                {isSubscribing
+                  ? '処理中...'
+                  : notificationPermission === 'granted'
+                    ? 'オフにする'
+                    : notificationPermission === 'denied'
+                      ? 'ブロック中'
+                      : 'オンにする'}
+              </button>
+            </div>
+            {notificationPermission === 'denied' && (
+              <p className="text-xs text-yellow-400">
+                ブラウザの設定で通知がブロックされています。アドレスバーの鍵マーク(🔒)から設定を変更してください。
+              </p>
+            )}
+          </div>
           <div className="bg-gray-800 rounded-xl p-6 space-y-6">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-400">

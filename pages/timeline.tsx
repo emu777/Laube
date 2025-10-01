@@ -251,11 +251,7 @@ const TimelinePage: NextPage = () => {
 
           {/* 投稿一覧 */}
           <div className="space-y-4">
-            {isLoading && (
-              <div className="text-center py-10">
-                <p>タイムラインを読み込んでいます...</p>
-              </div>
-            )}
+            {isLoading && null}
             {error && <div className="text-center py-10 text-red-400">読み込みに失敗しました。</div>}
             {items &&
               items.map((item) => {
