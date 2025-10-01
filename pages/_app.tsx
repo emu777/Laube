@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import { usePullToRefresh } from 'pull-to-refresh-react';
+import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -40,8 +40,6 @@ export default function MyApp({
     // SWRのキャッシュを再検証する
     mutate((key) => true, undefined, { revalidate: true });
   }, [mutate]);
-
-  const { isRefreshing } = usePullToRefresh({ onRefresh: handleRefresh });
 
   // プッシュ通知の購読処理
   useEffect(() => {
@@ -134,8 +132,15 @@ export default function MyApp({
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
-            {isRefreshing && <PageLoader />}
-            <main className="pt-20 pb-24">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
+            <main className="pt-20 pb-24">
+              {loading ? (
+                <PageLoader />
+              ) : (
+                <DynamicPullToRefresh onRefresh={handleRefresh}>
+                  <Component {...pageProps} />
+                </DynamicPullToRefresh>
+              )}
+            </main>
             {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>
