@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useSWRConfig } from 'swr';
 import { GetServerSidePropsContext } from 'next';
+import { useRouter } from 'next/router';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
@@ -33,6 +34,7 @@ type AccountPageProps = {
 export default function Account({ profile }: AccountPageProps) {
   const supabase = useSupabaseClient();
   const user = useUser();
+  const router = useRouter();
   const { mutate } = useSWRConfig();
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState<Profile['username']>(profile.username || '');
@@ -56,6 +58,9 @@ export default function Account({ profile }: AccountPageProps) {
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // 'from' クエリパラメータをチェックして、設定メニューからの遷移かどうかを判断
+  const isSettingsPage = router.query.from === 'settings';
 
   const isFormInvalid = useMemo(() => {
     return (
@@ -197,13 +202,13 @@ export default function Account({ profile }: AccountPageProps) {
       } else {
         // --- 購読処理 ---
         const permission = await window.Notification.requestPermission();
-        setNotificationPermission(permission);
 
         if (permission === 'granted') {
           const newSubscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
           });
+          setNotificationPermission('granted');
           await supabase
             .from('push_subscriptions')
             .upsert({ user_id: user.id, subscription: newSubscription }, { onConflict: 'user_id,subscription' });
@@ -212,8 +217,10 @@ export default function Account({ profile }: AccountPageProps) {
           alert(
             '通知がブロックされています。ブラウザの設定からこのサイトの通知を許可してください。\n\n【設定変更の方法】\nアドレスバーの左側にある鍵マーク(🔒)をクリックし、通知を「許可」に変更してください。'
           );
+          setNotificationPermission('denied');
         } else {
           alert('通知の許可が保留されました。');
+          setNotificationPermission('default');
         }
       }
     } catch (error) {
@@ -371,348 +378,8 @@ export default function Account({ profile }: AccountPageProps) {
           />
         </div>
 
-        <form className="w-full space-y-8" onSubmit={(e) => e.preventDefault()}>
-          {/* 必須項目 */}
-          <div className="bg-gray-800 rounded-xl p-6 space-y-6">
-            <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">必須項目</h2>
-            <div className="space-y-2">
-              <label htmlFor="username" className="text-sm font-medium text-gray-400">
-                ユーザー名
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username || ''}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2 relative">
-                <label htmlFor="location" className="text-sm font-medium text-gray-400">
-                  居住地
-                </label>
-                <select
-                  id="location"
-                  value={location || ''}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {locationOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="space-y-2 relative">
-                <label htmlFor="age" className="text-sm font-medium text-gray-400">
-                  年齢
-                </label>
-                <select
-                  id="age"
-                  value={age || ''}
-                  onChange={(e) => setAge(Number(e.target.value))}
-                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {ageOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3 pt-2">
-              <label className="text-sm font-medium text-gray-400">セクシャリティ（複数選択可）</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                {sexualityOptions.map((opt) => (
-                  <div key={opt} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`sexuality-${opt}`}
-                      value={opt}
-                      checked={(sexualities || []).includes(opt)}
-                      onChange={handleSexualityChange}
-                      className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
-                    />
-                    <label htmlFor={`sexuality-${opt}`} className="ml-3 text-sm">
-                      {opt}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2 relative">
-              <label htmlFor="vibe" className="text-sm font-medium text-gray-400">
-                雰囲気
-              </label>
-              <select
-                id="vibe"
-                value={vibe || ''}
-                onChange={(e) => setVibe(e.target.value)}
-                className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                required
-              >
-                <option value="">選択してください</option>
-                {vibeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                </svg>
-              </div>
-            </div>
-            <div className="space-y-2 relative">
-              <label htmlFor="position" className="text-sm font-medium text-gray-400">
-                ポジション
-              </label>
-              <select
-                id="position"
-                value={position || ''}
-                onChange={(e) => setPosition(e.target.value)}
-                className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                required
-              >
-                <option value="">選択してください</option>
-                {positionOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                </svg>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2 relative">
-                <label htmlFor="partner_status" className="text-sm font-medium text-gray-400">
-                  恋人
-                </label>
-                <select
-                  id="partner_status"
-                  value={partnerStatus || ''}
-                  onChange={(e) => setPartnerStatus(e.target.value)}
-                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {partnerStatusOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="space-y-2 relative">
-                <label htmlFor="marital_status" className="text-sm font-medium text-gray-400">
-                  結婚（子供）
-                </label>
-                <select
-                  id="marital_status"
-                  value={maritalStatus || ''}
-                  onChange={(e) => setMaritalStatus(e.target.value)}
-                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {maritalStatusOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3 pt-2">
-              <label className="text-sm font-medium text-gray-400">趣味（複数選択可）</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                {hobbyOptions.map((opt) => (
-                  <div key={opt} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`hobby-${opt}`}
-                      value={opt}
-                      checked={(hobbies || []).includes(opt)}
-                      onChange={handleHobbyChange}
-                      className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
-                    />
-                    <label htmlFor={`hobby-${opt}`} className="ml-3 text-sm">
-                      {opt}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 任意入力項目 */}
-          <div className="bg-gray-800 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setIsOptionalSectionOpen(!isOptionalSectionOpen)}
-              className="w-full p-6 text-left flex justify-between items-center"
-            >
-              <h2 className="text-lg font-semibold">任意入力項目</h2>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`h-5 w-5 transition-transform ${isOptionalSectionOpen ? 'rotate-180' : ''}`}
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-            {isOptionalSectionOpen && (
-              <div className="p-6 pt-0 space-y-6">
-                <div className="space-y-2">
-                  <label htmlFor="bio" className="text-sm font-medium text-gray-400">
-                    自己紹介
-                  </label>
-                  <textarea
-                    id="bio"
-                    rows={5}
-                    maxLength={200}
-                    value={bio || ''}
-                    onChange={(e) => setBio(e.target.value)}
-                    className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="space-y-2 relative">
-                    <label htmlFor="drinking" className="text-sm font-medium text-gray-400">
-                      飲酒
-                    </label>
-                    <select
-                      id="drinking"
-                      value={drinking || ''}
-                      onChange={(e) => setDrinking(e.target.value)}
-                      className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                    >
-                      <option value="">選択してください</option>
-                      {drinkingOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="space-y-2 relative">
-                    <label htmlFor="smoking" className="text-sm font-medium text-gray-400">
-                      喫煙
-                    </label>
-                    <select
-                      id="smoking"
-                      value={smoking || ''}
-                      onChange={(e) => setSmoking(e.target.value)}
-                      className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                    >
-                      <option value="">選択してください</option>
-                      {smokingOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="space-y-2 relative">
-                    <label htmlFor="dating_experience" className="text-sm font-medium text-gray-400">
-                      女性との交際歴
-                    </label>
-                    <select
-                      id="dating_experience"
-                      value={datingExperience || ''}
-                      onChange={(e) => setDatingExperience(e.target.value)}
-                      className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                    >
-                      <option value="">選択してください</option>
-                      {datingExperienceOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="space-y-2 relative sm:col-span-3">
-                    <label htmlFor="mbti" className="text-sm font-medium text-gray-400">
-                      MBTI
-                    </label>
-                    <select
-                      id="mbti"
-                      value={mbti || ''}
-                      onChange={(e) => setMbti(e.target.value)}
-                      className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                    >
-                      <option value="">選択してください</option>
-                      {mbtiOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* アカウント */}
+        {isSettingsPage ? (
+          // 「設定」ページの場合
           <div className="bg-gray-800 rounded-xl p-6 space-y-6">
             <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">通知設定</h2>
             <div className="flex items-center justify-between">
@@ -750,37 +417,350 @@ export default function Account({ profile }: AccountPageProps) {
               </p>
             )}
           </div>
-          <div className="bg-gray-800 rounded-xl p-6 space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-400">
-                メールアドレス
-              </label>
-              <input
-                id="email"
-                type="text"
-                value={user?.email || ''}
-                disabled
-                className="w-full p-3 text-gray-500 bg-gray-700/30 border border-gray-600 rounded-lg"
-              />
+        ) : (
+          // 「マイプロフ」ページの場合
+          <form className="w-full space-y-8" onSubmit={(e) => e.preventDefault()}>
+            {/* 必須項目 */}
+            <div className="bg-gray-800 rounded-xl p-6 space-y-6">
+              <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">必須項目</h2>
+              <div className="space-y-2">
+                <label htmlFor="username" className="text-sm font-medium text-gray-400">
+                  ユーザー名
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username || ''}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2 relative">
+                  <label htmlFor="location" className="text-sm font-medium text-gray-400">
+                    居住地
+                  </label>
+                  <select
+                    id="location"
+                    value={location || ''}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {locationOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="space-y-2 relative">
+                  <label htmlFor="age" className="text-sm font-medium text-gray-400">
+                    年齢
+                  </label>
+                  <select
+                    id="age"
+                    value={age || ''}
+                    onChange={(e) => setAge(Number(e.target.value))}
+                    className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {ageOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3 pt-2">
+                <label className="text-sm font-medium text-gray-400">セクシャリティ（複数選択可）</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                  {sexualityOptions.map((opt) => (
+                    <div key={opt} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`sexuality-${opt}`}
+                        value={opt}
+                        checked={(sexualities || []).includes(opt)}
+                        onChange={handleSexualityChange}
+                        className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
+                      />
+                      <label htmlFor={`sexuality-${opt}`} className="ml-3 text-sm">
+                        {opt}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 relative">
+                <label htmlFor="vibe" className="text-sm font-medium text-gray-400">
+                  雰囲気
+                </label>
+                <select
+                  id="vibe"
+                  value={vibe || ''}
+                  onChange={(e) => setVibe(e.target.value)}
+                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                  required
+                >
+                  <option value="">選択してください</option>
+                  {vibeOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="space-y-2 relative">
+                <label htmlFor="position" className="text-sm font-medium text-gray-400">
+                  ポジション
+                </label>
+                <select
+                  id="position"
+                  value={position || ''}
+                  onChange={(e) => setPosition(e.target.value)}
+                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                  required
+                >
+                  <option value="">選択してください</option>
+                  {positionOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2 relative">
+                  <label htmlFor="partner_status" className="text-sm font-medium text-gray-400">
+                    恋人
+                  </label>
+                  <select
+                    id="partner_status"
+                    value={partnerStatus || ''}
+                    onChange={(e) => setPartnerStatus(e.target.value)}
+                    className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {partnerStatusOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="space-y-2 relative">
+                  <label htmlFor="marital_status" className="text-sm font-medium text-gray-400">
+                    結婚（子供）
+                  </label>
+                  <select
+                    id="marital_status"
+                    value={maritalStatus || ''}
+                    onChange={(e) => setMaritalStatus(e.target.value)}
+                    className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {maritalStatusOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3 pt-2">
+                <label className="text-sm font-medium text-gray-400">趣味（複数選択可）</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                  {hobbyOptions.map((opt) => (
+                    <div key={opt} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`hobby-${opt}`}
+                        value={opt}
+                        checked={(hobbies || []).includes(opt)}
+                        onChange={handleHobbyChange}
+                        className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
+                      />
+                      <label htmlFor={`hobby-${opt}`} className="ml-3 text-sm">
+                        {opt}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
-            <button
-              onClick={handleUpdateProfile}
-              disabled={loading}
-              className="w-full p-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? '保存中...' : 'プロフィールを更新'}
-            </button>
-            <Link
-              href="/"
-              className="block w-full text-center bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg no-underline transition-colors"
-            >
-              戻る
-            </Link>
-          </div>
-        </form>
+            {/* 任意入力項目 */}
+            <div className="bg-gray-800 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setIsOptionalSectionOpen(!isOptionalSectionOpen)}
+                className="w-full p-6 text-left flex justify-between items-center"
+              >
+                <h2 className="text-lg font-semibold">任意入力項目</h2>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-5 w-5 transition-transform ${isOptionalSectionOpen ? 'rotate-180' : ''}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+              {isOptionalSectionOpen && (
+                <div className="p-6 pt-0 space-y-6">
+                  <div className="space-y-2">
+                    <label htmlFor="bio" className="text-sm font-medium text-gray-400">
+                      自己紹介
+                    </label>
+                    <textarea
+                      id="bio"
+                      rows={5}
+                      maxLength={200}
+                      value={bio || ''}
+                      onChange={(e) => setBio(e.target.value)}
+                      className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-2 relative">
+                      <label htmlFor="drinking" className="text-sm font-medium text-gray-400">
+                        飲酒
+                      </label>
+                      <select
+                        id="drinking"
+                        value={drinking || ''}
+                        onChange={(e) => setDrinking(e.target.value)}
+                        className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                      >
+                        <option value="">選択してください</option>
+                        {drinkingOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="space-y-2 relative">
+                      <label htmlFor="smoking" className="text-sm font-medium text-gray-400">
+                        喫煙
+                      </label>
+                      <select
+                        id="smoking"
+                        value={smoking || ''}
+                        onChange={(e) => setSmoking(e.target.value)}
+                        className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                      >
+                        <option value="">選択してください</option>
+                        {smokingOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="space-y-2 relative">
+                      <label htmlFor="dating_experience" className="text-sm font-medium text-gray-400">
+                        女性との交際歴
+                      </label>
+                      <select
+                        id="dating_experience"
+                        value={datingExperience || ''}
+                        onChange={(e) => setDatingExperience(e.target.value)}
+                        className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                      >
+                        <option value="">選択してください</option>
+                        {datingExperienceOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="space-y-2 relative sm:col-span-3">
+                      <label htmlFor="mbti" className="text-sm font-medium text-gray-400">
+                        MBTI
+                      </label>
+                      <select
+                        id="mbti"
+                        value={mbti || ''}
+                        onChange={(e) => setMbti(e.target.value)}
+                        className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
+                      >
+                        <option value="">選択してください</option>
+                        {mbtiOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </form>
+        )}
       </div>
     </PageLayout>
   );
