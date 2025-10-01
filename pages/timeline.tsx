@@ -246,7 +246,7 @@ const TimelinePage: NextPage = () => {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+    <div className="bg-gray-900 min-h-screen text-white">
       <main className="p-4">
         <div className="w-full max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">タイムライン</h1>

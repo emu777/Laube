@@ -125,7 +125,7 @@ const RecommendationsPage: NextPage = () => {
   });
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+    <div className="bg-gray-900 min-h-screen text-white">
       <main>
         <div className="w-full max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">オススメ</h1>

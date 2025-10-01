@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* react-pull-to-refresh のデフォルトCSSによるレイアウト崩れを修正 */
+body.ptr-state-loading,
+body.ptr-state-refreshing,
+body.ptr-state-pulling {
+  /* ライブラリがbodyに適用するtransformを無効化し、不自然な空きを防ぐ */
+  transform: none !important;
+}
+
+.ptr-element {
+  /* ローディングインジケーターをヘッダーの下に配置 */
+  position: fixed !important;
+  top: 80px !important; /* ヘッダーの高さ(h-20 = 5rem = 80px)に合わせて調整 */
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 30 !important; /* ヘッダー(z-40)よりは下、コンテンツよりは上に表示 */
+  height: 80px !important;
+}
