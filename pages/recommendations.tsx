@@ -75,7 +75,7 @@ const RecommendationsPage: NextPage = () => {
     return data || [];
   }, [supabase, user]);
 
-  const { data: recommendations, error, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
+  const { data: recommendations, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {
@@ -150,8 +150,7 @@ const RecommendationsPage: NextPage = () => {
 
           {/* 投稿一覧 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isLoading && <p>読み込み中...</p>}
-            {error && <p className="text-red-400">読み込みに失敗しました。</p>}{filteredRecommendations &&
+            {isLoading ? <p>読み込み中...</p> :
               filteredRecommendations.map((rec) => {
                 const videoId = getYouTubeVideoId(rec.youtube_url);
                 return videoId ? (
