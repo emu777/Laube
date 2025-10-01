@@ -70,9 +70,10 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
         },
         (payload) => {
           const newMessage = payload.new as Omit<Message, 'sender'>;
-          const senderProfile = newMessage.sender_id === user?.id
-            ? { id: user.id, username: user.user_metadata.username, avatar_url: user.user_metadata.avatar_url }
-            : otherUser;
+          const senderProfile =
+            newMessage.sender_id === user?.id
+              ? { id: user.id, username: user.user_metadata.username, avatar_url: user.user_metadata.avatar_url }
+              : otherUser;
 
           if (senderProfile) {
             setMessages((currentMessages) => [...currentMessages, { ...newMessage, sender: senderProfile as Profile }]);
@@ -106,13 +107,24 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     }
 
     // 相手に通知を送信
-    await supabase.from('notifications').insert({
-      recipient_id: otherUser.id,
-      sender_id: user.id,
-      type: 'message',
-      reference_id: roomId,
-      content_preview: newMessage.substring(0, 50), // メッセージ内容のプレビュー
-    });
+    await Promise.all([
+      supabase.from('notifications').insert({
+        recipient_id: otherUser.id,
+        sender_id: user.id,
+        type: 'message',
+        reference_id: roomId,
+        content_preview: newMessage.substring(0, 50),
+      }),
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          recipient_id: otherUser.id,
+          title: `${user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
+          body: newMessage.substring(0, 50),
+          tag: `chat-${roomId}`,
+          href: `/chat/${roomId}`,
+        },
+      }),
+    ]);
   };
 
   if (!otherUser) {
@@ -123,7 +135,14 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     <div className="bg-gray-900 flex flex-col h-screen text-white">
       <header className="fixed top-0 left-0 right-0 p-4 flex items-center gap-4 bg-gray-900/80 backdrop-blur-sm z-40 border-b border-gray-700">
         <button onClick={() => router.back()} className="text-white" aria-label="戻る">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -137,7 +156,9 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
           return (
             <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
               {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
-              <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${isMe ? 'bg-pink-600 rounded-br-md' : 'bg-gray-700 rounded-bl-md'}`}>
+              <div
+                className={`max-w-xs md:max-w-md p-3 rounded-2xl ${isMe ? 'bg-pink-600 rounded-br-md' : 'bg-gray-700 rounded-bl-md'}`}
+              >
                 <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
               </div>
             </div>
@@ -175,7 +196,9 @@ export default ChatRoomPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createPagesServerClient(ctx);
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return { redirect: { destination: '/login', permanent: false } };

@@ -1,0 +1,11 @@
+{
+  // Deno拡張機能を有効にする
+  "deno.enable": true,
+  // Deno拡張機能を有効にするパスを 'supabase/functions' に限定する
+  "deno.enablePaths": ["supabase/functions"],
+  // Deno拡張機能がリントとフォーマットを行うように設定
+  "deno.lint": true,
+  "deno.unstable": true,
+  // Next.jsプロジェクトのために、node_modulesのTypeScriptをデフォルトとして使用する
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

@@ -7,27 +7,7 @@ import useSWR from 'swr';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import PageLoader from '@/components/PageLoader';
-
-type Profile = {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  location: string | null;
-  age: number | null;
-  sexualities: string[] | null;
-  position: string | null;
-  vibe: string | null;
-  drinking: string | null;
-  smoking: string | null;
-  bio: string | null;
-  hobbies: string[] | null;
-  partner_status: string | null;
-  marital_status: string | null;
-  dating_experience: string | null;
-  mbti: string | null;
-};
-
-const ProfilePage: NextPage<{}> = () => {
+const ProfilePage: NextPage = () => {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
@@ -136,12 +116,23 @@ const ProfilePage: NextPage<{}> = () => {
       } else {
         setIsLiked(true);
         // 「いいね」された相手に通知を送る
-        await supabase.from('notifications').insert({
-          recipient_id: profile.id,
-          sender_id: user.id,
-          type: 'like',
-          reference_id: user.id,
-        });
+        await Promise.all([
+          supabase.from('notifications').insert({
+            recipient_id: profile.id,
+            sender_id: user.id,
+            type: 'like',
+            reference_id: user.id,
+          }),
+          supabase.functions.invoke('send-push-notification', {
+            body: {
+              recipient_id: profile.id,
+              title: '新しい「いいね！」が届きました',
+              body: `${user.user_metadata.username || '匿名さん'}さんがあなたに興味を持っています。`,
+              tag: 'like',
+              href: '/notifications',
+            },
+          }),
+        ]);
 
         if (isLikedBy) {
           // 相手も自分をいいねしていたらマッチング成立

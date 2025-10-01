@@ -1,5 +1,5 @@
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { SessionContextProvider, Session } from '@supabase/auth-helpers-react';
+import { SessionContextProvider, Session, useUser } from '@supabase/auth-helpers-react';
 import { AppProps } from 'next/app';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -30,6 +30,7 @@ export default function MyApp({
   initialSession: Session;
 }>) {
   const [supabaseClient] = useState(() => createPagesBrowserClient());
+  const user = useUser();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -37,6 +38,45 @@ export default function MyApp({
     router.replace(router.asPath);
     return Promise.resolve();
   }, [router]);
+
+  // プッシュ通知の購読処理
+  useEffect(() => {
+    const setupPushNotifications = async () => {
+      if ('serviceWorker' in navigator && 'PushManager' in window && user) {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+
+          // 既に購読済みか確認
+          let subscription = await registration.pushManager.getSubscription();
+
+          if (!subscription) {
+            // 購読していない場合は、許可を求めて購読する
+            const permission = await window.Notification.requestPermission();
+            if (permission !== 'granted') {
+              console.log('Push notification permission not granted.');
+              return;
+            }
+
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+            });
+          }
+
+          // 購読情報をSupabaseに保存
+          await supabaseClient
+            .from('push_subscriptions')
+            .upsert({ user_id: user.id, subscription: subscription }, { onConflict: 'user_id,subscription' });
+        } catch (error) {
+          console.error('Error setting up push notifications:', error);
+        }
+      }
+    };
+
+    if (user) {
+      setupPushNotifications();
+    }
+  }, [user, supabaseClient]);
 
   useEffect(() => {
     const handleStart = () => setLoading(true);
