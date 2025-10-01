@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic';
 import React from 'react';
 
-// 'react-pull-to-refresh'を、サーバーサイドレンダリング(SSR)を無効にして動的にインポートします。
+// Dynamically import 'react-pull-to-refresh' with SSR turned off.
 const PullToRefresh = dynamic(() => import('react-pull-to-refresh'), {
   ssr: false,
 });
@@ -12,7 +12,6 @@ type DynamicPullToRefreshProps = {
 };
 
 const DynamicPullToRefresh: React.FC<DynamicPullToRefreshProps> = ({ onRefresh, children }) => {
-  // このコンポーネントはクライアントサイドでのみレンダリングされます。
   return <PullToRefresh onRefresh={onRefresh}>{children}</PullToRefresh>;
 };
 

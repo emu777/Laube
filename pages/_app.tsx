@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import PullToRefresh from 'react-pull-to-refresh';
+import DynamicPullToRefresh from '@/components/DynamicPullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import '@/styles/globals.css';
@@ -138,9 +138,9 @@ export default function MyApp({
               {loading ? (
                 <PageLoader />
               ) : (
-                <PullToRefresh onRefresh={handleRefresh}>
+                <DynamicPullToRefresh onRefresh={handleRefresh}>
                   <Component {...pageProps} />
-                </PullToRefresh>
+                </DynamicPullToRefresh>
               )}
             </main>
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}{' '}
