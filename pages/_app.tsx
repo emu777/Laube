@@ -94,7 +94,11 @@ export default function MyApp({
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
             <main className="pt-20 pb-24">
-              {router.pathname.startsWith('/profile/') ? (
+              {loading ? (
+                <PageLoader />
+              ) : router.pathname.startsWith('/profile/') ||
+                router.pathname === '/chat' ||
+                router.pathname === '/notifications' ? (
                 <div className="h-full overflow-y-auto">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
               ) : (
                 <PullToRefresh onRefresh={handleRefresh}>
