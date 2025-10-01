@@ -2,8 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-  .delete-button {
-    @apply flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors px-2 py-1 rounded-md hover:bg-gray-700/50;
-  }
+/* react-pull-to-refresh のデフォルトCSSによるレイアウト崩れを修正 */
+/* bodyに適用されるtransformやpaddingをリセット */
+body.ptr-loading,
+body.ptr-refresh {
+  transform: none !important;
+  padding-top: 0 !important;
+  overflow: hidden !important; /* プル中にスクロールバーが二重に出るのを防ぐ */
+}
+
+/* プル更新のインジケーターが固定ヘッダーの下に隠れないように調整 */
+.ptr-element {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important; /* ヘッダーより上に表示 */
+}
+
+/* プル更新で動くコンテンツ部分のパディングを調整 */
+/* _app.tsx の main タグの pt-20 pb-24 と合わせて調整 */
+.refresh-view {
+  /* react-pull-to-refresh がこの要素を動かすため、
+     固定ヘッダー/フッター分のパディングはここで確保する */
+  padding-top: 80px; /* Headerの高さに合わせて調整 */
+  padding-bottom: 96px; /* BottomNavの高さに合わせて調整 */
+  min-height: calc(100vh - 80px - 96px); /* コンテンツが画面全体を埋めるように */
+  box-sizing: border-box;
 }

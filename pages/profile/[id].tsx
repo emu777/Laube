@@ -221,7 +221,9 @@ const ProfilePage: NextPage = () => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <main className="p-4 sm:p-6">
+      <main className="p-4">
+        {' '}
+        {/* p-4に統一 */}
         <div className="w-full max-w-md mx-auto bg-gray-800 rounded-xl p-6 space-y-6 relative pt-12 sm:pt-14 pb-6">
           {/* 閉じるボタン */}
           <button

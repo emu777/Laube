@@ -126,7 +126,9 @@ const RecommendationsPage: NextPage = () => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <main>
+      <main className="p-4">
+        {' '}
+        {/* p-4を追加してコンテンツの左右に余白を確保 */}
         <div className="w-full max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">オススメ</h1>
 

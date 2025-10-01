@@ -63,7 +63,9 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <main className="p-4">
+      {' '}
+      {/* overflow-x-hiddenを追加 */}
+      <main>
         <div className="w-full max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">トーク</h1>
 

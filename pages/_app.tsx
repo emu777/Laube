@@ -143,7 +143,7 @@ export default function MyApp({
                 </DynamicPullToRefresh>
               )}
             </main>
-            <BottomNav />
+            {router.pathname.startsWith('/chat') ? null : <BottomNav />} {/* チャットページではBottomNavを非表示 */}
           </div>
         </NotificationProvider>
       </SessionContextProvider>
