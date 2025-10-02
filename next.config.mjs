@@ -18,8 +18,9 @@ const nextConfig = {
 
 const pwaConfig = {
   dest: 'public',
-  register: false, // Service Workerの自動登録を無効化
+  register: true, // Service Workerの自動登録を有効化
   skipWaiting: true,
+  customWorkerDir: 'public/worker', // カスタムコードを配置するディレクトリを指定
 };
 
 export default withPWA(pwaConfig)(nextConfig);

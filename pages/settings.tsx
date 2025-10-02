@@ -11,9 +11,22 @@ const SettingsPage = () => {
   const [isSubscribing, setIsSubscribing] = useState(false);
 
   useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationPermission(window.Notification.permission);
-    }
+    // 購読状態を正しく判定するために、Service Workerの準備を待ってからチェックする
+    const checkSubscriptionStatus = async () => {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription && window.Notification.permission === 'granted') {
+          setNotificationPermission('granted');
+        } else if (window.Notification.permission === 'denied') {
+          setNotificationPermission('denied');
+        } else {
+          // 購読がない場合は、許可状態が 'granted' でも 'default' として扱う
+          setNotificationPermission('default');
+        }
+      }
+    };
+    checkSubscriptionStatus();
   }, []);
 
   const handleNotificationToggle = async () => {
@@ -31,7 +44,8 @@ const SettingsPage = () => {
       if (currentSubscription) {
         // --- 購読解除処理 ---
         await currentSubscription.unsubscribe();
-        await supabase.from('push_subscriptions').delete().match({ subscription: currentSubscription });
+        // PushSubscriptionオブジェクト全体ではなく、endpointを元に削除する
+        await supabase.from('push_subscriptions').delete().eq('subscription->>endpoint', currentSubscription.endpoint);
         setNotificationPermission('default');
         alert('通知をオフにしました。');
       } else {

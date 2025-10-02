@@ -82,8 +82,9 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
     // 楽観的UI更新: クリックされた通知をis_read: trueにして即時反映
     mutate(
       (currentNotifications: DisplayNotification[] | undefined) => {
-        if (!currentNotifications) return [];
-        return currentNotifications.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n));
+        // Ensure we are always working with an array
+        const notificationsArray = Array.isArray(currentNotifications) ? currentNotifications : [];
+        return notificationsArray.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n));
       },
       false // 再検証はしない
     );
