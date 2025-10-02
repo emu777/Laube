@@ -1,6 +1,6 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -34,6 +34,7 @@ type HomePageProps = {
 };
 
 const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
+  const user = useUser();
   const router = useRouter();
 
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
@@ -49,26 +50,24 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   // プロフィール一覧を取得するfetcher
   const profilesFetcher = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) throw new Error('Not authenticated');
-    const userId = sessionData.session.user.id;
+    if (!user) throw new Error('Not authenticated');
 
     const { data: blocksData } = await supabase
       .from('blocks')
       .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
     const blockedUserIds = new Set<string>();
     if (blocksData) {
       for (const block of blocksData) {
-        if (block.blocker_id === userId) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === userId) blockedUserIds.add(block.blocker_id);
+        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
       }
     }
 
     let profilesQuery = supabase
       .from('profiles')
       .select('id, username, avatar_url, location, age, last_seen, hobbies, bio')
-      .neq('id', userId)
+      .neq('id', user.id)
       .not('username', 'is', null);
     if (blockedUserIds.size > 0) {
       profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
@@ -80,32 +79,30 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   // 片思いユーザーを取得するfetcher
   const likedByUsersFetcher = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) throw new Error('Not authenticated');
-    const userId = sessionData.session.user.id;
+    if (!user) throw new Error('Not authenticated');
 
     // 1. ブロック関係のユーザーIDを取得
     const { data: blocksData } = await supabase
       .from('blocks')
       .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
     const blockedUserIds = new Set<string>();
     if (blocksData) {
       for (const block of blocksData) {
-        if (block.blocker_id === userId) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === userId) blockedUserIds.add(block.blocker_id);
+        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
       }
     }
 
     // 2. 自分が「いいね」したユーザーIDを取得
-    const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', userId);
+    const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', user.id);
     const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
 
     // 3. 除外するユーザーIDのリストを作成
     const excludeFromLikedBy = Array.from(new Set([...myLikedUserIds, ...Array.from(blockedUserIds)]));
 
     // 4. 自分を「いいね」したユーザーのIDと「いいね」した日時を取得
-    let likedByQuery = supabase.from('likes').select('created_at, liker_id').eq('liked_id', userId);
+    let likedByQuery = supabase.from('likes').select('created_at, liker_id').eq('liked_id', user.id);
     if (excludeFromLikedBy.length > 0) {
       likedByQuery = likedByQuery.not('liker_id', 'in', `(${excludeFromLikedBy.join(',')})`);
     }
@@ -115,16 +112,21 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
     // 5. 取得したIDを元に、ユーザーのプロフィール情報を取得
     const likerIds = likesData.map((like) => like.liker_id);
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', likerIds);
+    let profilesData: { id: string; username: string | null; avatar_url: string | null }[] | null = [];
+    let profilesError = null;
+
+    if (likerIds.length > 0) {
+      const { data, error } = await supabase.from('profiles').select('id, username, avatar_url').in('id', likerIds);
+      profilesData = data;
+      profilesError = error;
+    }
+
     if (profilesError) throw profilesError;
 
     // 6. 「いいね」情報とプロフィール情報を結合して返す
     return likesData.map((like) => ({
       created_at: like.created_at,
-      liker: profilesData.find((p) => p.id === like.liker_id) || null,
+      liker: (profilesData || []).find((p) => p.id === like.liker_id) || null,
     }));
   };
 
@@ -134,8 +136,8 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     router.push('/account');
   };
 
-  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>('profiles', profilesFetcher);
-  const { data: likedByUsers } = useSWR<LikedByUser[]>('likedByUsers', likedByUsersFetcher);
+  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(user ? 'profiles' : null, profilesFetcher);
+  const { data: likedByUsers } = useSWR<LikedByUser[]>(user ? 'likedByUsers' : null, likedByUsersFetcher);
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
@@ -197,7 +199,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
             </div>
           ) : null}
           {isLoadingProfiles ? null : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {profiles?.map((profile) => (
                 <ProfileCard key={profile.id} profile={profile} />
               ))}

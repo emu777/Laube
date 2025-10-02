@@ -69,7 +69,7 @@ const Header = () => {
               </li>
               <li>
                 <Link
-                  href="/account?from=settings" // クエリパラメータを追加
+                  href="/settings"
                   className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700"
                   onClick={() => setIsOpen(false)}
                 >

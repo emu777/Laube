@@ -20,7 +20,7 @@ const pwaConfig = {
   dest: 'public',
   register: true,
   skipWaiting: true,
-  swSrc: 'public/sw.js', // カスタムService Workerのソースファイルを指定
+  customWorkerDir: 'public/worker', // カスタムコードを配置するディレクトリを指定
   disable: process.env.NODE_ENV === 'development',
 };
 

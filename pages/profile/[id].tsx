@@ -9,7 +9,8 @@ const ProfilePage: NextPage = () => {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
-  const { id: profileId } = router.query as { id: string };
+  const { id } = router.query;
+  const profileId = Array.isArray(id) ? id[0] : id;
 
   const fetcher = useCallback(async () => {
     if (!profileId || !user) return null;

@@ -42,6 +42,18 @@ export default function MyApp({
   }, [mutate]);
 
   useEffect(() => {
+    if ('serviceWorker' in navigator && window.workbox !== undefined) {
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          console.log('Service Worker is ready.');
+        })
+        .catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+  }, []);
+
+  useEffect(() => {
     const handleStart = () => setLoading(true);
     const handleComplete = () => setLoading(false);
 

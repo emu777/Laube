@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
-import { useSWRConfig } from 'swr';
 import { GetServerSidePropsContext } from 'next';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import Link from 'next/link';
+import useSWR from 'swr';
 import Avatar from '@/components/Avatar';
 import PageLayout from '@/components/PageLayout';
 
@@ -26,36 +25,57 @@ type Profile = {
   mbti: string | null;
 };
 
-type AccountPageProps = {
-  profile: Profile;
-};
-
-export default function Account({ profile }: AccountPageProps) {
+export default function Account() {
   const supabase = useSupabaseClient();
   const user = useUser();
-  const { mutate } = useSWRConfig();
-  const [loading, setLoading] = useState(true);
-  const [username, setUsername] = useState<Profile['username']>(profile.username || '');
-  const [avatar_url, setAvatarUrl] = useState<Profile['avatar_url']>(profile.avatar_url || null);
-  const [location, setLocation] = useState<Profile['location']>(profile.location || '');
-  const [age, setAge] = useState<Profile['age']>(profile.age || null);
-  const [sexualities, setSexualities] = useState<Profile['sexualities']>(profile.sexualities || []);
-  const [position, setPosition] = useState<Profile['position']>(profile.position || '');
-  const [vibe, setVibe] = useState<Profile['vibe']>(profile.vibe || '');
-  const [drinking, setDrinking] = useState<Profile['drinking']>(profile.drinking || '');
-  const [smoking, setSmoking] = useState<Profile['smoking']>(profile.smoking || '');
-  const [bio, setBio] = useState<Profile['bio']>(profile.bio || '');
-  const [hobbies, setHobbies] = useState<Profile['hobbies']>(profile.hobbies || []);
-  const [partnerStatus, setPartnerStatus] = useState<Profile['partner_status']>(profile.partner_status || '');
-  const [maritalStatus, setMaritalStatus] = useState<Profile['marital_status']>(profile.marital_status || '');
-  const [datingExperience, setDatingExperience] = useState<Profile['dating_experience']>(
-    profile.dating_experience || ''
-  );
-  const [mbti, setMbti] = useState<Profile['mbti']>(profile.mbti || '');
+
+  const fetcher = useCallback(async () => {
+    if (!user) return null;
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (error) throw error;
+    return data;
+  }, [supabase, user]);
+
+  const { data: profile, error, isLoading, mutate } = useSWR<Profile>(user ? 'profile' : null, fetcher);
+
+  const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState<Profile['username']>('');
+  const [avatar_url, setAvatarUrl] = useState<Profile['avatar_url']>(null);
+  const [location, setLocation] = useState<Profile['location']>('');
+  const [age, setAge] = useState<Profile['age']>(null);
+  const [sexualities, setSexualities] = useState<Profile['sexualities']>([]);
+  const [position, setPosition] = useState<Profile['position']>('');
+  const [vibe, setVibe] = useState<Profile['vibe']>('');
+  const [drinking, setDrinking] = useState<Profile['drinking']>('');
+  const [smoking, setSmoking] = useState<Profile['smoking']>('');
+  const [bio, setBio] = useState<Profile['bio']>('');
+  const [hobbies, setHobbies] = useState<Profile['hobbies']>([]);
+  const [partnerStatus, setPartnerStatus] = useState<Profile['partner_status']>('');
+  const [maritalStatus, setMaritalStatus] = useState<Profile['marital_status']>('');
+  const [datingExperience, setDatingExperience] = useState<Profile['dating_experience']>('');
+  const [mbti, setMbti] = useState<Profile['mbti']>('');
+
+  useEffect(() => {
+    if (profile) {
+      setUsername(profile.username || '');
+      setAvatarUrl(profile.avatar_url || null);
+      setLocation(profile.location || '');
+      setAge(profile.age || null);
+      setSexualities(profile.sexualities || []);
+      setPosition(profile.position || '');
+      setVibe(profile.vibe || '');
+      setDrinking(profile.drinking || '');
+      setSmoking(profile.smoking || '');
+      setBio(profile.bio || '');
+      setHobbies(profile.hobbies || []);
+      setPartnerStatus(profile.partner_status || '');
+      setMaritalStatus(profile.marital_status || '');
+      setDatingExperience(profile.dating_experience || '');
+      setMbti(profile.mbti || '');
+    }
+  }, [profile]);
 
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const isFormInvalid = useMemo(() => {
     return (
@@ -73,70 +93,26 @@ export default function Account({ profile }: AccountPageProps) {
     );
   }, [username, location, age, sexualities, vibe, position, partnerStatus, maritalStatus, hobbies]);
 
-  useEffect(() => {
-    setLoading(false);
-    if ('Notification' in window) {
-      setNotificationPermission(window.Notification.permission);
-    }
-  }, []);
-
-  // (ここに `handleNotificationToggle` 関数を追加します)
-
-  async function updateProfile(
-    {
-      username,
-      avatar_url,
-      location,
-      age,
-      sexualities,
-      position,
-      vibe,
-      drinking,
-      smoking,
-      bio,
-      hobbies,
-      partner_status: partnerStatus,
-      marital_status: maritalStatus,
-      dating_experience: datingExperience,
-      mbti,
-    }: Partial<Profile>,
-    alertMessage: string = 'プロフを更新しました。'
-  ) {
+  async function updateProfile(updates: Partial<Profile>, alertMessage: string = 'プロフを更新しました。') {
     try {
-      // The 'arguments' object is special and cannot be modified.
       setLoading(true);
       if (!user) throw new Error('No user');
 
-      const updates = {
-        id: user.id,
-        username,
-        avatar_url,
-        location,
-        age,
-        sexualities,
-        position,
-        vibe,
-        drinking,
-        smoking,
-        bio,
-        hobbies,
-        partner_status: partnerStatus,
-        marital_status: maritalStatus,
-        dating_experience: datingExperience,
-        mbti,
+      const updatesWithTimestamp = {
+        ...updates,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from('profiles').upsert(updates);
+      console.log('プロフィール更新開始 (DB送信データ):', updates);
+      // `id` を条件に、更新可能なデータのみを送信する
+      const { error } = await supabase.from('profiles').update(updatesWithTimestamp).eq('id', user.id);
       if (error) throw error;
+      mutate(); // SWRのキャッシュを再検証してUIを更新
       alert(alertMessage);
-      mutate(`profile_${user.id}`); // SWRキャッシュを再検証してUIを更新
+      console.log('プロフィール更新成功');
     } catch (error) {
-      if (error instanceof Error) {
-        // The 'arguments' object is special and cannot be modified.
-        alert('Error updating the data!');
-        console.log(error);
-      }
+      alert('プロフィールの更新中にエラーが発生しました。');
+      console.error('プロフィール更新エラー:', error);
     } finally {
       setLoading(false);
     }
@@ -147,10 +123,10 @@ export default function Account({ profile }: AccountPageProps) {
       alert('必須項目で未入力の項目があります。');
       return;
     }
-    updateProfile({
+    const updates: Partial<Profile> = {
       username,
+      avatar_url, // avatar_urlを更新オブジェクトに含める
       location,
-      age,
       sexualities,
       position,
       vibe,
@@ -158,12 +134,17 @@ export default function Account({ profile }: AccountPageProps) {
       smoking,
       bio,
       hobbies,
-      partner_status: partnerStatus,
-      marital_status: maritalStatus,
-      dating_experience: datingExperience,
-      mbti,
-    });
-  };
+      partner_status: partnerStatus, // Supabaseのカラム名に合わせる
+      marital_status: maritalStatus, // Supabaseのカラム名に合わせる
+      dating_experience: datingExperience, // Supabaseのカラム名に合わせる
+      mbti, // Supabaseのカラム名に合わせる
+    };
+    // ageがnullでない場合のみupdatesオブジェクトに追加
+    if (age !== null) {
+      updates.age = age;
+    }
+    updateProfile(updates);
+  }; // handleUpdateProfileの終了
   const handleSexualityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = e.target;
     setSexualities((prev) => {
@@ -174,54 +155,6 @@ export default function Account({ profile }: AccountPageProps) {
         return prevSexualities.filter((item) => item !== value);
       }
     });
-  };
-
-  const handleNotificationToggle = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !user) {
-      alert('お使いのブラウザはプッシュ通知に対応していません。');
-      return;
-    }
-
-    setIsSubscribing(true);
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const currentSubscription = await registration.pushManager.getSubscription();
-
-      if (currentSubscription) {
-        // --- 購読解除処理 ---
-        await currentSubscription.unsubscribe();
-        await supabase.from('push_subscriptions').delete().match({ subscription: currentSubscription });
-        setNotificationPermission('default'); // or 'prompt'
-        alert('通知をオフにしました。');
-      } else {
-        // --- 購読処理 ---
-        const permission = await window.Notification.requestPermission();
-        setNotificationPermission(permission);
-
-        if (permission === 'granted') {
-          const newSubscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-          });
-          await supabase
-            .from('push_subscriptions')
-            .upsert({ user_id: user.id, subscription: newSubscription }, { onConflict: 'user_id,subscription' });
-          alert('通知をオンにしました！');
-        } else if (permission === 'denied') {
-          alert(
-            '通知がブロックされています。ブラウザの設定からこのサイトの通知を許可してください。\n\n【設定変更の方法】\nアドレスバーの左側にある鍵マーク(🔒)をクリックし、通知を「許可」に変更してください。'
-          );
-        } else {
-          alert('通知の許可が保留されました。');
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling push notifications:', error);
-      alert('通知設定の変更中にエラーが発生しました。');
-    } finally {
-      setIsSubscribing(false);
-    }
   };
 
   const handleHobbyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,7 +285,7 @@ export default function Account({ profile }: AccountPageProps) {
     'ESFP',
   ];
 
-  if (!user) return null;
+  if (isLoading || !user) return <PageLayout maxWidth="max-w-2xl">読み込み中...</PageLayout>;
 
   return (
     <PageLayout maxWidth="max-w-2xl">
@@ -384,6 +317,7 @@ export default function Account({ profile }: AccountPageProps) {
                 type="text"
                 value={username || ''}
                 onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
                 className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                 required
               />
@@ -397,6 +331,7 @@ export default function Account({ profile }: AccountPageProps) {
                   id="location"
                   value={location || ''}
                   onChange={(e) => setLocation(e.target.value)}
+                  autoComplete="address-level1"
                   className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                   required
                 >
@@ -712,44 +647,6 @@ export default function Account({ profile }: AccountPageProps) {
             )}
           </div>
 
-          {/* アカウント */}
-          <div className="bg-gray-800 rounded-xl p-6 space-y-6">
-            <h2 className="text-lg font-semibold border-b border-gray-700 pb-3">通知設定</h2>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">プッシュ通知</p>
-                <p className="text-sm text-gray-400">
-                  {notificationPermission === 'granted'
-                    ? '新しい「いいね」やメッセージを即時にお知らせします。'
-                    : notificationPermission === 'denied'
-                      ? '通知はブロックされています。'
-                      : '通知はオフになっています。'}
-                </p>
-              </div>
-              <button
-                onClick={handleNotificationToggle}
-                disabled={isSubscribing || notificationPermission === 'denied'}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  notificationPermission === 'granted'
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-pink-600 hover:bg-pink-700 text-white'
-                }`}
-              >
-                {isSubscribing
-                  ? '処理中...'
-                  : notificationPermission === 'granted'
-                    ? 'オフにする'
-                    : notificationPermission === 'denied'
-                      ? 'ブロック中'
-                      : 'オンにする'}
-              </button>
-            </div>
-            {notificationPermission === 'denied' && (
-              <p className="text-xs text-yellow-400">
-                ブラウザの設定で通知がブロックされています。アドレスバーの鍵マーク(🔒)から設定を変更してください。
-              </p>
-            )}
-          </div>
           <div className="bg-gray-800 rounded-xl p-6 space-y-6">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-400">
@@ -759,6 +656,7 @@ export default function Account({ profile }: AccountPageProps) {
                 id="email"
                 type="text"
                 value={user?.email || ''}
+                autoComplete="email"
                 disabled
                 className="w-full p-3 text-gray-500 bg-gray-700/30 border border-gray-600 rounded-lg"
               />
@@ -773,12 +671,6 @@ export default function Account({ profile }: AccountPageProps) {
             >
               {loading ? '保存中...' : 'プロフィールを更新'}
             </button>
-            <Link
-              href="/"
-              className="block w-full text-center bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg no-underline transition-colors"
-            >
-              戻る
-            </Link>
           </div>
         </form>
       </div>
@@ -787,30 +679,10 @@ export default function Account({ profile }: AccountPageProps) {
 }
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session)
-    return {
-      redirect: {
-        destination: '/',
-        permanent: false,
-      },
-    };
-
-  const { data: profileData, error } = await supabase.from('profiles').select(`*`).eq('id', session.user.id).single();
-
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116: 0 rows
-    console.error('Error fetching profile on server', error);
-  }
-
+  // サーバーサイドでのデータ取得は行わない
   return {
     props: {
-      initialSession: session,
-      profile: profileData || {},
+      // initialSessionとprofileはクライアントサイドで取得するため不要
     },
   };
 };
