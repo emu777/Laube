@@ -22,8 +22,18 @@ const pwaConfig = {
   dest: 'public',
   register: true, // Service Workerの自動登録を有効化
   skipWaiting: true,
-  swSrc: 'public/sw.js', // カスタムService Workerのソースファイルを指定
-  disable: process.env.NODE_ENV === 'development', // 開発環境ではPWAを無効化
+  customWorkerDir: 'public/worker', // カスタムコードを配置するディレクトリを指定
+  disable: false, // 開発環境でもPWAを有効にする
+  // 開発モードでの "Failed to fetch" エラーを抑制するための設定
+  runtimeCaching: isDev
+    ? [
+        {
+          urlPattern: /.*/i,
+          handler: 'NetworkOnly',
+          options: { cacheName: 'dev' },
+        },
+      ]
+    : undefined,
 };
 
 export default withPWA(pwaConfig)(nextConfig);
