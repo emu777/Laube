@@ -42,14 +42,11 @@ export default function MyApp({
   }, [mutate]);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && window.workbox !== undefined) {
-      navigator.serviceWorker.ready
-        .then((registration) => {
-          console.log('Service Worker is ready.');
-        })
-        .catch((error) => {
-          console.error('Service Worker registration failed:', error);
-        });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => console.log('Service Worker registration successful with scope: ', registration.scope))
+        .catch((err) => console.log('Service Worker registration failed: ', err));
     }
   }, []);
 
