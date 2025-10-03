@@ -20,10 +20,9 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const pwaConfig = {
   dest: 'public',
-  register: true, // Service Workerの自動登録を有効化
+  register: false, // Service Workerの自動登録を無効化
   skipWaiting: true,
-  disable: false, // 開発環境でもPWAを有効にする
-  swSrc: 'public/sw.js', // カスタムService Workerのソースファイルを指定
+  disable: process.env.NODE_ENV === 'development',
 };
 
 export default withPWA(pwaConfig)(nextConfig);
