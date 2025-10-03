@@ -20,7 +20,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const pwaConfig = {
   dest: 'public',
-  register: false, // Service Workerの自動登録を無効化
+  register: false, // Service Workerの自動登録を完全に無効化
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
 };

@@ -1,11 +1,15 @@
+/* eslint-disable no-restricted-globals */
+
 // public/sw.js
 
 // Service Workerがインストールされたときに即座に有効化する
 self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Install');
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activate');
   event.waitUntil(self.clients.claim());
 });
 
