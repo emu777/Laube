@@ -123,11 +123,13 @@ const ProfilePage: NextPage = () => {
             reference_id: user.id,
           }),
           supabase.functions.invoke('send-push-notification', {
-            recipient_id: profile.id,
-            title: '新しい「いいね！」が届きました',
-            body: `${user.user_metadata.username || '匿名さん'}さんがあなたに興味を持っています。`,
-            tag: 'like',
-            href: '/notifications',
+            body: {
+              recipient_id: profile.id,
+              title: '新しい「いいね！」が届きました',
+              body: `${user.user_metadata.username || '匿名さん'}さんがあなたに興味を持っています。`,
+              tag: 'like',
+              href: '/notifications',
+            },
           }),
         ]);
 

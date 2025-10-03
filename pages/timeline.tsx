@@ -220,13 +220,24 @@ const TimelinePage: NextPage = () => {
       const { data: post } = await supabase.from('posts').select('user_id, content').eq('id', postId).single();
 
       if (post && post.user_id !== user.id) {
-        await supabase.from('notifications').insert({
-          recipient_id: post.user_id,
-          sender_id: user.id,
-          type: 'comment',
-          reference_id: postId, // 投稿ID
-          content_preview: post.content.substring(0, 50), // 投稿内容のプレビュー
-        });
+        await Promise.all([
+          supabase.from('notifications').insert({
+            recipient_id: post.user_id,
+            sender_id: user.id,
+            type: 'comment',
+            reference_id: postId, // 投稿ID
+            content_preview: post.content.substring(0, 50), // 投稿内容のプレビュー
+          }),
+          supabase.functions.invoke('send-push-notification', {
+            body: {
+              recipient_id: post.user_id,
+              title: `${user.user_metadata.username || '匿名さん'}さんからコメントが届きました`,
+              body: newCommentContent,
+              tag: `comment_${postId}`,
+              href: `/timeline#${postId}`,
+            },
+          }),
+        ]);
       }
 
       setNewCommentContent('');
