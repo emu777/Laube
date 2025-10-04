@@ -15,7 +15,6 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.4.0",
     "@supabase/supabase-js": "^2.45.0",
-    "cookies-next": "^6.1.0",
     "date-fns": "^4.1.0",
     "geist": "^1.5.1",
     "next": "15.5.4",
@@ -29,7 +28,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@netlify/plugin-nextjs": "^5.5.0",
+    "@netlify/plugin-nextjs": "^5.13.4",
     "@types/cookie": "^0.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
