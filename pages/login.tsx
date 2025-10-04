@@ -84,23 +84,26 @@ const Login: NextPage = () => {
 export default Login;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const cookies = {
-    getAll: () => {
-      const parsedCookies = parse(ctx.req.headers.cookie || '');
-      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
-    },
-    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
-      ctx.res.setHeader(
-        'Set-Cookie',
-        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
-      );
-    },
-  };
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies }
+    {
+      cookies: {
+        getAll: () => {
+          const parsedCookies = parse(ctx.req.headers.cookie || '');
+          return Object.entries(parsedCookies).map(([name, value]) => ({
+            name,
+            value,
+          }));
+        },
+        setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+          ctx.res.setHeader(
+            'Set-Cookie',
+            cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+          );
+        },
+      },
+    }
   );
   const {
     data: { session },
