@@ -5,11 +5,18 @@ import { NextPage, GetServerSidePropsContext } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useRouter } from 'next/router';
 import { useSupabase } from './_app';
+import { useState, useEffect } from 'react';
 
 const Login: NextPage = () => {
   const supabase = useSupabase();
   const router = useRouter();
   const { view } = router.query;
+  const [redirectTo, setRedirectTo] = useState('');
+
+  useEffect(() => {
+    // クライアントサイドでのみ window.location.origin を取得
+    setRedirectTo(window.location.origin);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-900 p-4">
@@ -67,7 +74,7 @@ const Login: NextPage = () => {
           }}
           theme="dark"
           providers={['google']} // 'github'や'apple'など、他のプロバイダーも追加できます
-          redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`}
+          redirectTo={redirectTo}
         />
       </div>
     </div>
