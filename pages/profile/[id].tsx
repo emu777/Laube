@@ -1,11 +1,13 @@
-import { NextPage } from 'next';
+import { GetServerSidePropsContext, NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import PageLoader from '@/components/PageLoader';
 import { useSupabase } from '../_app';
-import type { User } from '@supabase/supabase-js';
+import type { User, SupabaseClient } from '@supabase/supabase-js';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
 const ProfilePage: NextPage = () => {
   const supabase = useSupabase();
   const [user, setUser] = useState<User | null>(null);
@@ -47,7 +49,11 @@ const ProfilePage: NextPage = () => {
     return { profile, isLiked, isLikedBy, isMyProfile, isMatched };
   }, [supabase, user, profileId]);
 
-  const { data, error, isLoading } = useSWR(profileId ? `profile_${profileId}` : null, fetcher);
+  // profileId と user.id の両方が利用可能になってからSWRキーを生成し、fetcherを実行する
+  const swrKey = profileId && user ? `profile_${profileId}_${user.id}` : null;
+  const { data, error, isLoading } = useSWR(swrKey, fetcher, {
+    revalidateOnFocus: false, // 画面フォーカス時の自動再検証を無効化
+  });
 
   const { profile, isLikedBy, isMyProfile } = data || {};
 
@@ -214,7 +220,8 @@ const ProfilePage: NextPage = () => {
     router.push('/');
   };
 
-  if (isLoading) {
+  // データ取得中、または表示に必要なIDが未確定の間はローディング画面を表示
+  if (isLoading || !profileId || !user) {
     return <PageLoader />;
   }
 
@@ -526,9 +533,3 @@ const ProfilePage: NextPage = () => {
 };
 
 export default ProfilePage;
-
-export const getServerSideProps = async () => {
-  return {
-    props: {},
-  };
-};

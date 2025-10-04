@@ -171,7 +171,17 @@ const AppContent = ({ Component, pageProps }: AppProps) => {
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
-      <main className="pt-20 pb-24">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
+      <main className="pt-20 pb-24">
+        {usePullToRefresh ? (
+          <DynamicPullToRefresh onRefresh={handleRefresh}>
+            {loading ? <PageLoader /> : <Component {...pageProps} />}
+          </DynamicPullToRefresh>
+        ) : loading ? (
+          <PageLoader />
+        ) : (
+          <Component {...pageProps} />
+        )}
+      </main>
       {router.pathname.startsWith('/chat/') ? null : <BottomNav unreadNotificationCount={unreadNotificationCount} />}
     </div>
   );
