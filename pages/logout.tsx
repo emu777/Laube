@@ -1,20 +1,25 @@
-import { GetServerSideProps } from 'next';
+import { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { getCookie, setCookie } from 'cookies-next';
+import { serialize, parse } from 'cookie';
 
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
+export const getServerSideProps: GetServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => getCookie(name, ctx),
-        set: (name: string, value: string, options: CookieOptions) => {
-          setCookie(name, value, { ...ctx, ...options });
+        getAll: () => {
+          const parsedCookies = parse(ctx.req.headers.cookie || '');
+          return Object.entries(parsedCookies).map(([name, value]) => ({
+            name,
+            value,
+          }));
         },
-        remove: (name: string, options: CookieOptions) => {
-          // `cookies-next` には `remove` がないので、空の値をセットして有効期限を過去にする
-          setCookie(name, '', { ...ctx, ...options, maxAge: 0 });
+        setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+          ctx.res.setHeader(
+            'Set-Cookie',
+            cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+          );
         },
       },
     }

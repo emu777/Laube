@@ -1,8 +1,9 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { useSession, useSupabase } from '@/pages/_app';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
+import { serialize, parse } from 'cookie';
 import AvatarIcon from '@/components/AvatarIcon';
 
 type Profile = {
@@ -27,8 +28,8 @@ type ChatRoomPageProps = {
 };
 
 const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser, roomId }) => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
+  const session = useSession();
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
@@ -44,17 +45,17 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
   // このルームに入室したときに、既読情報を更新する
   useEffect(() => {
-    if (user && roomId) {
+    if (session?.user && roomId) {
       const markAsRead = async () => {
         await supabase.from('read_receipts').upsert({
           room_id: roomId,
-          user_id: user.id,
+          user_id: session.user.id,
           last_read_at: new Date().toISOString(),
         });
       };
       markAsRead();
     }
-  }, [user, roomId, supabase]);
+  }, [session, roomId, supabase]);
 
   useEffect(() => {
     const channel = supabase
@@ -71,8 +72,12 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
         (payload) => {
           const newMessage = payload.new as Omit<Message, 'sender'>;
           const senderProfile =
-            newMessage.sender_id === user?.id
-              ? { id: user.id, username: user.user_metadata.username, avatar_url: user.user_metadata.avatar_url }
+            newMessage.sender_id === session?.user.id
+              ? ({
+                  id: session.user.id,
+                  username: session.user.user_metadata.username,
+                  avatar_url: session.user.user_metadata.avatar_url,
+                } as Profile)
               : otherUser;
 
           if (senderProfile) {
@@ -89,13 +94,13 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, user, otherUser]);
+  }, [supabase, roomId, session, otherUser]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !otherUser) return;
+    if (!newMessage.trim() || !session?.user || !otherUser) return;
 
-    const { error } = await supabase
+    const { error } = await supabase // prettier-ignore
       .from('messages')
       .insert({ content: newMessage, room_id: roomId, sender_id: user.id });
 
@@ -110,12 +115,13 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     await Promise.all([
       supabase.from('notifications').insert({
         recipient_id: otherUser.id,
-        sender_id: user.id,
+        sender_id: session.user.id,
         type: 'message',
         reference_id: roomId,
         content_preview: newMessage.substring(0, 50),
       }),
       supabase.functions.invoke('send-push-notification', {
+        // prettier-ignore
         body: {
           recipient_id: otherUser.id,
           title: `${user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
@@ -152,7 +158,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
       <main className="flex-1 overflow-y-auto pt-20 pb-24 px-4 space-y-4">
         {messages.map((message) => {
-          const isMe = message.sender_id === user?.id;
+          const isMe = message.sender_id === session?.user.id;
           return (
             <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
               {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
@@ -195,7 +201,24 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 export default ChatRoomPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => {
+          const parsedCookies = parse(ctx.req.headers.cookie || '');
+          return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+        },
+        setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+          ctx.res.setHeader(
+            'Set-Cookie',
+            cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+          );
+        },
+      },
+    }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();
