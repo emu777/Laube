@@ -32,12 +32,11 @@ export default function Account() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    fetchUser();
   }, [supabase]);
 
   const fetcher = useCallback(async () => {
@@ -708,10 +707,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
   return {

@@ -3,9 +3,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSupabase } from '@/pages/_app';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
-import { serialize, parse } from 'cookie';
+import { parse } from 'cookie';
 import AvatarIcon from '@/components/AvatarIcon';
-import { Session } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 
 type Profile = {
   id: string;
@@ -30,18 +30,18 @@ type ChatRoomPageProps = {
 
 const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser, roomId }) => {
   const supabase = useSupabase();
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
     };
-    fetchSession();
+    fetchUser();
   }, [supabase]);
 
   const scrollToBottom = () => {
@@ -54,17 +54,17 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
   // このルームに入室したときに、既読情報を更新する
   useEffect(() => {
-    if (session?.user && roomId) {
+    if (user && roomId) {
       const markAsRead = async () => {
         await supabase.from('read_receipts').upsert({
           room_id: roomId,
-          user_id: session.user.id,
+          user_id: user.id,
           last_read_at: new Date().toISOString(),
         });
       };
       markAsRead();
     }
-  }, [session, roomId, supabase]);
+  }, [user, roomId, supabase]);
 
   useEffect(() => {
     const channel = supabase
@@ -81,11 +81,11 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
         (payload) => {
           const newMessage = payload.new as Omit<Message, 'sender'>;
           const senderProfile =
-            newMessage.sender_id === session?.user.id
+            newMessage.sender_id === user?.id
               ? ({
-                  id: session.user.id,
-                  username: session.user.user_metadata.username,
-                  avatar_url: session.user.user_metadata.avatar_url,
+                  id: user.id,
+                  username: user.user_metadata.username,
+                  avatar_url: user.user_metadata.avatar_url,
                 } as Profile)
               : otherUser;
 
@@ -103,15 +103,15 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, session, otherUser]);
+  }, [supabase, roomId, user, otherUser]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !session?.user || !otherUser) return;
+    if (!newMessage.trim() || !user || !otherUser) return;
 
     const { error } = await supabase // prettier-ignore
       .from('messages')
-      .insert({ content: newMessage, room_id: roomId, sender_id: session.user.id });
+      .insert({ content: newMessage, room_id: roomId, sender_id: user.id });
 
     if (error) {
       console.error('Error sending message:', error);
@@ -124,7 +124,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     await Promise.all([
       supabase.from('notifications').insert({
         recipient_id: otherUser.id,
-        sender_id: session.user.id,
+        sender_id: user.id,
         type: 'message',
         reference_id: roomId,
         content_preview: newMessage.substring(0, 50),
@@ -133,7 +133,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
         // prettier-ignore
         body: {
           recipient_id: otherUser.id,
-          title: `${session.user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
+          title: `${user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
           body: newMessage.substring(0, 50),
           tag: `chat-${roomId}`,
           href: `/chat/${roomId}`,
@@ -167,7 +167,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
       <main className="flex-1 overflow-y-auto pt-20 pb-24 px-4 space-y-4">
         {messages.map((message) => {
-          const isMe = message.sender_id === session?.user.id;
+          const isMe = message.sender_id === user?.id;
           return (
             <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
               {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
@@ -229,10 +229,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
@@ -243,7 +243,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     .from('chat_rooms')
     .select('*, user1:profiles!user1_id(*), user2:profiles!user2_id(*)')
     .eq('id', roomId)
-    .or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`)
+    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
     .single();
 
   if (roomError || !room) {
@@ -262,7 +262,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { notFound: true };
   }
 
-  const otherUser = room.user1.id === session.user.id ? room.user2 : room.user1;
+  const otherUser = room.user1.id === user.id ? room.user2 : room.user1;
 
   return {
     props: {

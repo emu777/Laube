@@ -104,10 +104,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (session) {
+  if (user) {
     return {
       redirect: {
         destination: '/',
@@ -123,7 +123,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   return {
     props: {
-      initialSession: session,
+      initialSession: null, // This prop is not used, setting to null
       redirectTo,
     },
   };

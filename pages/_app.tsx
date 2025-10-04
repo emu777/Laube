@@ -82,10 +82,16 @@ export default function MyApp({
       // このタイミングで一度だけトップページに遷移させ、URLからハッシュを消去します。
       // window.location.assign('/') を使うと無限リロードの原因になることがあるため、
       // router.push('/') を使用します。
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        // ログインまたはログアウト時にページをリフレッシュして、サーバーとクライアントの認証状態を同期させる
+        router.replace(router.asPath);
+      } else if (event === 'SIGNED_OUT') {
+        router.push('/login');
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabaseClient]); // 依存配列を修正
+  }, [supabaseClient, router]); // 依存配列を修正
 
   // NavigationGuardContext の実装
   const navigationGuardContextValue = {

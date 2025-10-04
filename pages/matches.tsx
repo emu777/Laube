@@ -162,15 +162,15 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
   // 1. 自分が「いいね」したユーザーのIDリストを取得
-  const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', session.user.id);
+  const { data: myLikes } = await supabase.from('likes').select('liked_id').eq('liker_id', user.id);
   const myLikedUserIds = myLikes ? myLikes.map((like) => like.liked_id) : [];
 
   if (myLikedUserIds.length === 0) {
@@ -181,7 +181,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const { data: matchedLikeIds, error: likeError } = await supabase
     .from('likes')
     .select('liker_id')
-    .eq('liked_id', session.user.id)
+    .eq('liked_id', user.id)
     .in('liker_id', myLikedUserIds);
 
   if (likeError) {

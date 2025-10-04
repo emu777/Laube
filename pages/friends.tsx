@@ -111,10 +111,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
@@ -122,7 +122,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const { data: chatRooms, error: roomsError } = await supabase
     .from('chat_rooms')
     .select('id, user1_id, user2_id')
-    .or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
+    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
 
   if (roomsError) {
     console.error('Error fetching chat rooms:', roomsError);
@@ -134,9 +134,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   // 2. チャット相手のIDリストと、ルームIDをキーにしたマップを作成
-  const partnerIds = chatRooms.map((room) => (room.user1_id === session.user.id ? room.user2_id : room.user1_id));
+  const partnerIds = chatRooms.map((room) => (room.user1_id === user.id ? room.user2_id : room.user1_id));
   const roomIdMap = new Map(
-    chatRooms.map((room) => [room.user1_id === session.user.id ? room.user2_id : room.user1_id, room.id])
+    chatRooms.map((room) => [room.user1_id === user.id ? room.user2_id : room.user1_id, room.id])
   );
 
   // 3. チャット相手のプロフィール情報と、各ルームの最新メッセージ、未読数を取得
@@ -158,7 +158,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
       .single()
   );
   const readReceiptsQueries = chatRooms.map((room) =>
-    supabase.from('read_receipts').select('last_read_at').eq('room_id', room.id).eq('user_id', session.user.id).single()
+    supabase.from('read_receipts').select('last_read_at').eq('room_id', room.id).eq('user_id', user.id).single()
   );
 
   const messagesResults = await Promise.all(messageQueries);

@@ -251,17 +251,17 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
   const { data: notifications, error } = await supabase
     .from('notifications')
     .select('*, sender:sender_id(id, username, avatar_url)')
-    .eq('recipient_id', session.user.id)
+    .eq('recipient_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) console.error('Error fetching notifications:', error);

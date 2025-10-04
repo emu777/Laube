@@ -382,10 +382,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
