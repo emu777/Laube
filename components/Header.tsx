@@ -97,15 +97,6 @@ const Header = () => {
                   フレンド一覧
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/logout"
-                  className="block px-4 py-3 text-red-400 no-underline rounded hover:bg-gray-700"
-                  onClick={() => setIsOpen(false)}
-                >
-                  ログアウト
-                </Link>
-              </li>
             </ul>
           </div>
         </div>

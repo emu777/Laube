@@ -5,6 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSupabase } from './_app';
 import type { User } from '@supabase/supabase-js';
 import PageLayout from '@/components/PageLayout';
+import Link from 'next/link';
 
 const SettingsPage = () => {
   const supabase = useSupabase();
@@ -110,7 +111,7 @@ const SettingsPage = () => {
               <p className="font-medium">プッシュ通知</p>
               <p className="text-sm text-gray-400">
                 {notificationPermission === 'granted'
-                  ? '新しい「いいね」やメッセージを即時にお知らせします。'
+                  ? 'アプリを閉じていても通知が届くようになります。'
                   : notificationPermission === 'denied'
                     ? '通知はブロックされています。'
                     : '通知はオフになっています。'}
@@ -134,6 +135,13 @@ const SettingsPage = () => {
             </p>
           )}
         </div>
+        {/* ここからログアウトのセクションを追加 */}
+        <div className="mt-8 pt-6 border-t border-gray-700 text-center">
+          <Link href="/logout" className="inline-block text-red-500 hover:text-red-400 transition-colors duration-200">
+            ログアウト
+          </Link>
+        </div>
+        {/* ここまで */}
       </div>
     </PageLayout>
   );

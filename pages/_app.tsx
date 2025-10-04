@@ -1,11 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { AppProps } from 'next/app';
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import Head from 'next/head'; // Added for PWA theme-color and manifest
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
+import dynamic from 'next/dynamic';
 import PageLoader from '@/components/PageLoader';
-import { NotificationProvider } from '@/contexts/NotificationContext';
-import PullToRefresh from '@/components/PullToRefresh';
+import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext'; // useNotifications に修正
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
@@ -39,62 +40,73 @@ export const useSupabase = () => {
   return context;
 };
 
+// --- New NavigationGuardContext ---
+type NavigationGuardFunction = (targetPath: string) => Promise<boolean>;
+
+interface NavigationGuardContextType {
+  registerNavigationGuard: (guard: NavigationGuardFunction) => void;
+  unregisterNavigationGuard: () => void;
+  triggerNavigationGuard: (targetPath: string) => Promise<boolean>;
+}
+
+export const NavigationGuardContext = createContext<NavigationGuardContextType | null>(null);
+
+export const useNavigationGuard = () => {
+  const context = useContext(NavigationGuardContext);
+  if (context === null) {
+    throw new Error('useNavigationGuard must be used within a NavigationGuardProvider');
+  }
+  return context;
+};
+// --- End New NavigationGuardContext ---
+
+// react-pull-to-refresh は window オブジェクトに依存するため、クライアントサイドでのみ読み込む
+const DynamicPullToRefresh = dynamic(() => import('react-pull-to-refresh'), {
+  ssr: false,
+});
+
 export default function MyApp({
   Component,
   pageProps,
+  router, // routerプロパティをpropsから受け取る
 }: AppProps<{
   initialSession: Session | null;
 }>) {
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [currentNavigationGuard, setCurrentNavigationGuard] = useState<NavigationGuardFunction | null>(null);
 
-  // 認証状態の変更を監視し、変更があればページをリフレッシュする
+  // 認証状態の変更を監視し、変更があればページをリフレッシュする (クライアントサイドでのみ実行)
   useEffect(() => {
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange((event, session) => {
-      // メールアドレスでのログイン・新規登録が成功した場合、手動でリダイレクト
       if (event === 'SIGNED_IN' && session) {
-        router.push('/');
+        // ログインが成功した場合、ページを完全にリロードしてトップに遷移
+        // これにより、サーバーサイドで最新のセッション情報を使ってデータが再取得される
+        window.location.assign('/');
       }
-      // ログアウトは/logoutページで処理するため、ここでは何もしない
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, []); // このuseEffectはsupabaseClientに依存しますが、一度だけ実行されれば良いので空の依存配列でOK
 
-  const handleRefresh = useCallback(async () => {
-    window.location.reload();
-  }, []);
-
-  useEffect(() => {
-    const handleStart = () => setLoading(true);
-    const handleComplete = () => setLoading(false);
-
-    router.events.on('routeChangeStart', handleStart);
-    router.events.on('routeChangeComplete', handleComplete);
-    router.events.on('routeChangeError', handleComplete);
-
-    // 5分ごとに最終アクティビティを更新
-    const interval = setInterval(
-      async () => {
-        const {
-          data: { user },
-        } = await supabaseClient.auth.getUser();
-        if (user) {
-          await supabaseClient.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id);
+  // NavigationGuardContext の実装
+  const navigationGuardContextValue = {
+    registerNavigationGuard: useCallback((guard: NavigationGuardFunction) => {
+      setCurrentNavigationGuard(() => guard); // 関数を直接セット
+    }, []),
+    unregisterNavigationGuard: useCallback(() => {
+      setCurrentNavigationGuard(null);
+    }, []),
+    triggerNavigationGuard: useCallback(
+      async (targetPath: string) => {
+        if (currentNavigationGuard) {
+          return await currentNavigationGuard(targetPath);
         }
+        return true; // ガードが登録されていなければ常に遷移を許可
       },
-      5 * 60 * 1000
-    );
-
-    return () => {
-      router.events.off('routeChangeStart', handleStart);
-      router.events.off('routeChangeComplete', handleComplete);
-      router.events.off('routeChangeError', handleComplete);
-      clearInterval(interval);
-    };
-  }, [router]);
+      [currentNavigationGuard]
+    ),
+  };
 
   return (
     <>
@@ -114,25 +126,62 @@ export default function MyApp({
       `}</style>
       <SupabaseContext.Provider value={supabaseClient}>
         <NotificationProvider>
-          <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-            <Header />
-            <main className="pt-20 pb-24">
-              {loading ? (
-                <PageLoader />
-              ) : router.pathname.startsWith('/profile/') ||
-                router.pathname.startsWith('/chat/') ||
-                router.pathname === '/notifications' ? (
-                <div className="h-full overflow-y-auto">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
-              ) : (
-                <PullToRefresh onRefresh={handleRefresh}>
-                  <div className="pb-6">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
-                </PullToRefresh>
-              )}
-            </main>
-            {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
-          </div>
+          <NavigationGuardContext.Provider value={navigationGuardContextValue}>
+            {' '}
+            {/* Add Provider here */}
+            <AppContent Component={Component} pageProps={pageProps} router={router} />
+          </NavigationGuardContext.Provider>{' '}
+          {/* Close Provider here */}
         </NotificationProvider>
       </SupabaseContext.Provider>
     </>
   );
 }
+
+// UIのレンダリングとフックの呼び出しをこのコンポーネントに集約
+const AppContent = ({ Component, pageProps }: AppProps) => {
+  const router = useRouter();
+  const { unreadCount: unreadNotificationCount } = useNotifications();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const handleStart = () => setLoading(true);
+    const handleComplete = () => setLoading(false);
+
+    router.events.on('routeChangeStart', handleStart);
+    router.events.on('routeChangeComplete', handleComplete);
+    router.events.on('routeChangeError', handleComplete);
+
+    return () => {
+      router.events.off('routeChangeStart', handleStart);
+      router.events.off('routeChangeComplete', handleComplete);
+      router.events.off('routeChangeError', handleComplete);
+    };
+  }, [router]);
+
+  const handleRefresh = useCallback(async () => {
+    window.location.reload();
+  }, []);
+
+  const usePullToRefresh = !['/profile/', '/chat/', '/notifications', '/account', '/settings'].some((path) =>
+    router.pathname.startsWith(path)
+  );
+
+  return (
+    <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
+      <Header />
+      <main className="pt-20 pb-24">
+        {usePullToRefresh ? (
+          <DynamicPullToRefresh onRefresh={handleRefresh}>
+            {loading ? <PageLoader /> : <Component {...pageProps} />}
+          </DynamicPullToRefresh>
+        ) : loading ? (
+          <PageLoader />
+        ) : (
+          <Component {...pageProps} />
+        )}
+      </main>
+      {router.pathname.startsWith('/chat/') ? null : <BottomNav unreadNotificationCount={unreadNotificationCount} />}
+    </div>
+  );
+};
