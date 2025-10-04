@@ -24,12 +24,6 @@ const mplus1 = M_PLUS_1({
   display: 'swap',
 });
 
-// Supabaseクライアントをコンポーネントの外で一度だけ生成する
-const supabaseClient = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const SupabaseContext = createContext<SupabaseClient | null>(null);
 
 export const useSupabase = () => {
@@ -72,6 +66,10 @@ export default function MyApp({
 }: AppProps<{
   initialSession: Session | null;
 }>) {
+  // リクエストごとに新しいSupabaseクライアントを生成する
+  const [supabaseClient] = useState(() =>
+    createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  );
   const [currentNavigationGuard, setCurrentNavigationGuard] = useState<NavigationGuardFunction | null>(null);
 
   // 認証状態の変更を監視し、変更があればページをリフレッシュする (クライアントサイドでのみ実行)
@@ -84,13 +82,10 @@ export default function MyApp({
       // このタイミングで一度だけトップページに遷移させ、URLからハッシュを消去します。
       // window.location.assign('/') を使うと無限リロードの原因になることがあるため、
       // router.push('/') を使用します。
-      if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
-        router.push('/');
-      }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]); // routerオブジェクトを依存配列に追加
+  }, [supabaseClient]); // 依存配列を修正
 
   // NavigationGuardContext の実装
   const navigationGuardContextValue = {
@@ -181,7 +176,10 @@ const AppContent = ({ Component, pageProps }: AppProps) => {
       <main className={router.pathname.startsWith('/chat/') ? 'pb-24' : 'pt-20 pb-24'}>
         {loading ? <PageLoader /> : <Component {...pageProps} />}
       </main>
-      {router.pathname.startsWith('/chat/') ? null : <BottomNav unreadNotificationCount={unreadNotificationCount} />}
+      {/* チャットページとログインページではボトムナビゲーションを非表示にする */}
+      {router.pathname.startsWith('/chat/') || router.pathname === '/login' ? null : (
+        <BottomNav unreadNotificationCount={unreadNotificationCount} />
+      )}
     </div>
   );
 };
