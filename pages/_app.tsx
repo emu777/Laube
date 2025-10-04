@@ -1,8 +1,6 @@
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { SessionContextProvider, Session, useUser } from '@supabase/auth-helpers-react';
+import { createBrowserClient } from '@supabase/ssr';
 import { AppProps } from 'next/app';
-import { useSWRConfig } from 'swr';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import PageLoader from '@/components/PageLoader';
@@ -10,6 +8,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import PullToRefresh from '@/components/PullToRefresh';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
+import type { SupabaseClient, Session } from '@supabase/supabase-js';
 import '@/styles/globals.css';
 
 const notoSansJP = Noto_Sans_JP({
@@ -24,22 +23,45 @@ const mplus1 = M_PLUS_1({
   display: 'swap',
 });
 
+// Supabaseクライアントをコンポーネントの外で一度だけ生成する
+const supabaseClient = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const SupabaseContext = createContext<SupabaseClient | null>(null);
+
+export const useSupabase = () => {
+  const context = useContext(SupabaseContext);
+  if (context === null) {
+    throw new Error('useSupabase must be used within a SupabaseProvider');
+  }
+  return context;
+};
+
 export default function MyApp({
   Component,
   pageProps,
 }: AppProps<{
-  initialSession: Session;
+  initialSession: Session | null;
 }>) {
-  const [supabaseClient] = useState(() => createPagesBrowserClient());
-  const user = useUser();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { mutate } = useSWRConfig();
+
+  // 認証状態の変更を監視し、変更があればページをリフレッシュする
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      // ログアウト時は Header の方でリダイレクトするため、ここでは何もしない
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const handleRefresh = useCallback(async () => {
-    // SWRのキャッシュを再検証する
-    mutate((key) => true, undefined, { revalidate: true });
-  }, [mutate]);
+    window.location.reload();
+  }, []);
 
   useEffect(() => {
     const handleStart = () => setLoading(true);
@@ -53,13 +75,10 @@ export default function MyApp({
     const interval = setInterval(
       async () => {
         const {
-          data: { session },
-        } = await supabaseClient.auth.getSession();
-        if (session) {
-          await supabaseClient
-            .from('profiles')
-            .update({ last_seen: new Date().toISOString() })
-            .eq('id', session.user.id);
+          data: { user },
+        } = await supabaseClient.auth.getUser();
+        if (user) {
+          await supabaseClient.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id);
         }
       },
       5 * 60 * 1000
@@ -71,7 +90,7 @@ export default function MyApp({
       router.events.off('routeChangeError', handleComplete);
       clearInterval(interval);
     };
-  }, [router, supabaseClient]);
+  }, [router]);
 
   return (
     <>
@@ -89,7 +108,7 @@ export default function MyApp({
           font-family: var(--font-m-plus-1);
         }
       `}</style>
-      <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
+      <SupabaseContext.Provider value={supabaseClient}>
         <NotificationProvider>
           <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
             <Header />
@@ -97,7 +116,7 @@ export default function MyApp({
               {loading ? (
                 <PageLoader />
               ) : router.pathname.startsWith('/profile/') ||
-                router.pathname === '/chat' ||
+                router.pathname.startsWith('/chat/') ||
                 router.pathname === '/notifications' ? (
                 <div className="h-full overflow-y-auto">{loading ? <PageLoader /> : <Component {...pageProps} />}</div>
               ) : (
@@ -106,11 +125,10 @@ export default function MyApp({
                 </PullToRefresh>
               )}
             </main>
-            {/* 相手とのチャット画面(`/chat/[id]`)でのみBottomNavを非表示 */}
             {router.pathname.startsWith('/chat/') ? null : <BottomNav />}
           </div>
         </NotificationProvider>
-      </SessionContextProvider>
+      </SupabaseContext.Provider>
     </>
   );
 }

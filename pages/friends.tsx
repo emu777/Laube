@@ -1,7 +1,9 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useRef, MouseEvent as ReactMouseEvent } from 'react';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
+import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect } from 'react';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import AvatarIcon from '@/components/AvatarIcon';
 import PageLayout from '@/components/PageLayout';
@@ -17,12 +19,22 @@ type FriendsPageProps = {
 };
 
 const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
+  const [user, setUser] = useState<User | null>(null);
   const [friendList, setFriendList] = useState(friends);
   const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
   const [swipedItemId, setSwipedItemId] = useState<string | null>(null);
   const dragStartX = useRef(0);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
 
   const handleDragStart = (e: ReactMouseEvent<HTMLDivElement>, id: string) => {
     dragStartX.current = e.clientX;
@@ -143,7 +155,23 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ friends }) => {
 export default FriendsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();

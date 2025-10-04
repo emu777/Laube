@@ -1,7 +1,4 @@
 /** @type {import('next').NextConfig} */
-import withPWA from 'next-pwa';
-
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   images: {
@@ -16,13 +13,4 @@ const nextConfig = {
   },
 };
 
-const isDev = process.env.NODE_ENV === 'development';
-
-const pwaConfig = {
-  dest: 'public',
-  register: false, // Service Workerの自動登録を完全に無効化
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-};
-
-export default withPWA(pwaConfig)(nextConfig);
+export default nextConfig;

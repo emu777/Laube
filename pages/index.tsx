@@ -1,8 +1,10 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useEffect } from 'react';
+import { serialize, parse } from 'cookie';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import useSWR from 'swr';
 import ProfileCard from '@/components/ProfileCard';
@@ -34,8 +36,13 @@ type HomePageProps = {
 };
 
 const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
-  const user = useUser();
+  const supabase = useSupabase();
   const router = useRouter();
+  const { data: userData } = useSWR('user', async () => {
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  });
+  const user = userData;
 
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
 
@@ -43,13 +50,12 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     if (isNewUser) {
       setShowAddToHomeScreenModal(true);
     }
-  }, [isNewUser, router]);
+  }, [isNewUser]);
 
   const [showAllLikedBy, setShowAllLikedBy] = useState(false);
-  const supabase = useSupabaseClient();
 
   // プロフィール一覧を取得するfetcher
-  const profilesFetcher = async () => {
+  const profilesFetcher = useCallback(async () => {
     if (!user) throw new Error('Not authenticated');
 
     const { data: blocksData } = await supabase
@@ -75,10 +81,10 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     const { data, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
     if (error) throw error;
     return data;
-  };
+  }, [supabase, user]);
 
   // 片思いユーザーを取得するfetcher
-  const likedByUsersFetcher = async () => {
+  const likedByUsersFetcher = useCallback(async () => {
     if (!user) throw new Error('Not authenticated');
 
     // 1. ブロック関係のユーザーIDを取得
@@ -128,7 +134,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
       created_at: like.created_at,
       liker: (profilesData || []).find((p) => p.id === like.liker_id) || null,
     }));
-  };
+  }, [supabase, user]);
 
   const handleCloseModalAndRedirect = () => {
     setShowAddToHomeScreenModal(false);
@@ -136,8 +142,16 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     router.push('/account');
   };
 
-  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(user ? 'profiles' : null, profilesFetcher);
-  const { data: likedByUsers } = useSWR<LikedByUser[]>(user ? 'likedByUsers' : null, likedByUsersFetcher);
+  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(
+    user ? `profiles_${user.id}` : null,
+    profilesFetcher,
+    {}
+  );
+  const { data: likedByUsers } = useSWR<LikedByUser[]>(
+    user ? `likedByUsers_${user.id}` : null,
+    likedByUsersFetcher,
+    {}
+  );
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
@@ -208,7 +222,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
       {/* ホーム画面追加案内モーダル */}
       {showAddToHomeScreenModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 z-40 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
             <h2 className="text-xl font-bold text-white">ホーム画面に追加</h2>
             <p className="text-sm text-gray-300">
@@ -264,7 +278,23 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 export default Home;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();

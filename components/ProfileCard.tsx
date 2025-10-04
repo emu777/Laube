@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSupabase } from '@/pages/_app';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -14,7 +14,7 @@ type Profile = {
 };
 
 const ProfileCard = ({ profile }: { profile: Profile }) => {
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {

@@ -1,10 +1,12 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { useState, useCallback } from 'react';
+import { serialize, parse } from 'cookie';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import useSWR from 'swr';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import AvatarIcon from '@/components/AvatarIcon';
 
 type Recommendation = {
@@ -36,9 +38,14 @@ const getYouTubeVideoId = (url: string): string | null => {
 };
 
 const RecommendationsPage: NextPage = () => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
   const router = useRouter();
+  const { data: userData } = useSWR('user', async () => {
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  });
+  const user = userData;
+
   const [newUrl, setNewUrl] = useState('');
   const [newComment, setNewComment] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -73,7 +80,11 @@ const RecommendationsPage: NextPage = () => {
     return data || [];
   }, [supabase, user]);
 
-  const { data: recommendations, isLoading } = useSWR<Recommendation[]>('recommendations', fetcher);
+  const {
+    data: recommendations,
+    isLoading,
+    mutate,
+  } = useSWR<Recommendation[]>(user ? `recommendations_${user.id}` : null, fetcher);
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {
@@ -100,7 +111,7 @@ const RecommendationsPage: NextPage = () => {
       setNewComment('');
       setNewCategory('');
       setIsFormOpen(false);
-      router.replace(router.asPath);
+      mutate(); // SWRのキャッシュを再検証してUIを更新
     }
   };
 
@@ -198,7 +209,7 @@ const RecommendationsPage: NextPage = () => {
       {/* 投稿フォームモーダル */}
       {isFormOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4"
           role="button"
           tabIndex={0}
           onClick={() => setIsFormOpen(false)}
@@ -290,7 +301,23 @@ const RecommendationsPage: NextPage = () => {
 export default RecommendationsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();

@@ -1,32 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
+import { useSupabase } from '@/pages/_app';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const router = useRouter();
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.replace('/login'); // 変更なしですが、これが正しい実装です
-  };
-
-  const openLogoutConfirm = () => {
-    setIsOpen(false); // メインメニューを閉じる
-    setShowLogoutConfirm(true); // 確認モーダルを開く
-  };
+  // ログインページではヘッダーを表示しない
+  if (router.pathname === '/login') {
+    return null;
+  }
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 p-4 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm z-40">
+      <header className="fixed top-0 left-0 right-0 p-4 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm z-[100]">
         <Link href="/" className="text-2xl font-bold text-white no-underline">
           Laube
         </Link>
-        <div className="relative z-30">
-          <button onClick={() => setIsOpen(!isOpen)} className="bg-transparent border-none text-white cursor-pointer">
+        <div className={`relative ${isOpen ? 'z-[99]' : 'z-[103]'}`}>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="bg-transparent border-none text-white cursor-pointer"
+            aria-label="メニューを開閉"
+          >
             {isOpen ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -55,7 +53,21 @@ const Header = () => {
         </div>
       </header>
       {isOpen && (
-        <div className="fixed inset-0 bg-gray-900 z-30 pt-20 px-4">
+        <div className="fixed inset-0 bg-black/70 z-[101]">
+          {/* メニューを閉じるための透明なボタン。これによりイベントの競合を防ぐ */}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="absolute inset-0 w-full h-full cursor-default"
+            aria-label="メニューを閉じる"
+          ></button>
+        </div>
+      )}
+      <div
+        className={`fixed top-0 right-0 bottom-0 bg-gray-900 border-l border-gray-700 shadow-2xl z-[102] w-64 transform transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="pt-20 px-4">
           <div className="w-full max-w-md mx-auto">
             <ul className="list-none m-0 p-0 space-y-1">
               <li>
@@ -86,41 +98,18 @@ const Header = () => {
                 </Link>
               </li>
               <li>
-                <button
-                  onClick={openLogoutConfirm}
-                  className="w-full text-left bg-transparent border-none px-4 py-3 text-red-400 cursor-pointer hover:bg-gray-700 rounded"
+                <Link
+                  href="/logout"
+                  className="block px-4 py-3 text-red-400 no-underline rounded hover:bg-gray-700"
+                  onClick={() => setIsOpen(false)}
                 >
                   ログアウト
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
         </div>
-      )}
-
-      {/* ログアウト確認モーダル */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center shadow-xl space-y-4">
-            <h2 className="text-lg font-bold text-white">確認</h2>
-            <p className="text-sm text-gray-300">ログアウトしますか？</p>
-            <div className="flex gap-4 pt-2">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="w-full p-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors"
-              >
-                いいえ
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full p-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
-              >
-                はい
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </>
   );
 };

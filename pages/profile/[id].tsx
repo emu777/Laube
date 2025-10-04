@@ -1,13 +1,14 @@
 import { NextPage } from 'next';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import PageLoader from '@/components/PageLoader';
+import { useSupabase } from '../_app';
+import type { User } from '@supabase/supabase-js';
 const ProfilePage: NextPage = () => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
+  const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const { id } = router.query;
   const profileId = Array.isArray(id) ? id[0] : id;
@@ -63,6 +64,16 @@ const ProfilePage: NextPage = () => {
       setIsMatched(data.isMatched);
     }
   }, [data]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
 
   useEffect(() => {
     if (profile?.avatar_url) {

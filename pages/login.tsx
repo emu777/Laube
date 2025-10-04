@@ -1,31 +1,21 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { serialize, parse } from 'cookie';
 import { NextPage, GetServerSidePropsContext } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+import { useSupabase } from './_app';
 
 const Login: NextPage = () => {
-  const session = useSession();
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const router = useRouter();
   const { view } = router.query;
-
-  useEffect(() => {
-    if (session) {
-      router.replace('/');
-    }
-  }, [session, router]);
-
-  if (session) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-900 p-4">
       <div className="w-full max-w-md mx-auto">
         <h1 className="text-4xl font-bold text-white text-center mb-8">Laube</h1>
+
         <Auth
           supabaseClient={supabase}
           view={view === 'sign_up' ? 'sign_up' : 'sign_in'}
@@ -77,6 +67,7 @@ const Login: NextPage = () => {
           }}
           theme="dark"
           providers={['google']} // 'github'や'apple'など、他のプロバイダーも追加できます
+          redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`}
         />
       </div>
     </div>
@@ -86,7 +77,24 @@ const Login: NextPage = () => {
 export default Login;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -101,6 +109,8 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   return {
-    props: {},
+    props: {
+      initialSession: session,
+    },
   };
 };

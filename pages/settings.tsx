@@ -1,14 +1,28 @@
 import { useState, useEffect } from 'react';
-import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { GetServerSidePropsContext } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { serialize, parse } from 'cookie';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import PageLayout from '@/components/PageLayout';
 
 const SettingsPage = () => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
+  const [user, setUser] = useState<User | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // getServerSideProps と _app.tsx で認証状態は管理されているため、
+  // この onAuthStateChange は不要です。
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
 
   useEffect(() => {
     // 購読状態を正しく判定するために、Service Workerの準備を待ってからチェックする
@@ -128,7 +142,23 @@ const SettingsPage = () => {
 export default SettingsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();

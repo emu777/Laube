@@ -1,9 +1,12 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AvatarIcon from '@/components/AvatarIcon';
 import useSWR from 'swr';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -30,8 +33,18 @@ type ChatPageProps = {
 };
 
 const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
-  const user = useUser();
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
 
   const fetcher = async () => {
     if (!user) return [];
@@ -124,7 +137,23 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
 export default ChatPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();

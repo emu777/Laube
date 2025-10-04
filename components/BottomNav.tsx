@@ -7,6 +7,11 @@ const BottomNav = () => {
   const router = useRouter();
   const { unreadCount: unreadNotificationCount } = useNotifications();
 
+  // ログインページではボトムナビゲーションを表示しない
+  if (router.pathname === '/login') {
+    return null;
+  }
+
   // 各アイコンの定義
   const UsersIcon = ({ className }: { className?: string }) => (
     <svg

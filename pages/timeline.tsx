@@ -1,12 +1,14 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { FaRegComment } from 'react-icons/fa';
 import AvatarIcon from '@/components/AvatarIcon';
+import { useSupabase } from './_app';
+import type { User } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -43,9 +45,14 @@ type Post = {
 type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'comment' });
 
 const TimelinePage: NextPage = () => {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const supabase = useSupabase();
   const router = useRouter();
+  const { data: userData } = useSWR('user', async () => {
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  });
+  const user = userData;
+
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
@@ -87,7 +94,12 @@ const TimelinePage: NextPage = () => {
     return (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
   }, [supabase, user]);
 
-  const { data: items, error, isLoading, mutate } = useSWR<TimelineItem[]>('timeline_items', fetcher, {});
+  const {
+    data: items,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<TimelineItem[]>(user ? `timeline_items_${user.id}` : null, fetcher, {});
 
   // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {
@@ -482,7 +494,23 @@ const TimelinePage: NextPage = () => {
 export default TimelinePage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -492,8 +520,6 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   return {
-    props: {
-      // initialItemsはSWRで取得するため、空の配列を渡すか、何も渡さない
-    },
+    props: {},
   };
 };

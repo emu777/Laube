@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSupabase } from '@/pages/_app';
 import Image from 'next/image';
 
 type AvatarIconProps = {
@@ -9,7 +9,7 @@ type AvatarIconProps = {
 };
 
 const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,13 +26,7 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
         style={{ width: size, height: size }}
       >
         {publicUrl ? (
-          <Image
-            src={publicUrl}
-            alt="avatar"
-            className="w-full h-full object-cover"
-            width={size}
-            height={size}
-          />
+          <Image src={publicUrl} alt="avatar" className="w-full h-full object-cover" width={size} height={size} />
         ) : (
           <div className="w-full h-full bg-gray-700" />
         )}

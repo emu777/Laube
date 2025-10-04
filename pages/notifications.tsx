@@ -1,8 +1,9 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
 import { useRouter } from 'next/router';
 import AvatarIcon from '@/components/AvatarIcon';
+import { useSupabase } from './_app';
 import useSWR, { useSWRConfig } from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -71,7 +72,7 @@ const getNotificationInfo = (notification: Notification) => {
 };
 
 const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: serverNotifications }) => {
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { data: notifications } = useSWR('notifications', () => serverNotifications, {
@@ -201,7 +202,23 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
 export default NotificationsPage;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createPagesServerClient(ctx);
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
   const {
     data: { session },
   } = await supabase.auth.getSession();
