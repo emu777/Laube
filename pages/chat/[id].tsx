@@ -148,7 +148,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
   return (
     <div className="bg-gray-900 flex flex-col h-screen text-white">
-      <header className="fixed top-0 left-0 right-0 p-4 flex items-center gap-4 bg-gray-900/80 backdrop-blur-sm z-40 border-b border-gray-700">
+      <header className="fixed top-0 left-0 right-0 p-4 flex items-center gap-4 bg-gray-900/80 backdrop-blur-sm z-40 border-b border-gray-700 h-20">
         <button onClick={() => router.back()} className="text-white" aria-label="戻る">
           <svg
             xmlns="http://www.w3.org/2000/svg"

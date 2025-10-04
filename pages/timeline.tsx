@@ -12,6 +12,16 @@ import type { User } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
+// ユーザープロフィールの基本的な型を定義
+type Profile = {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  location?: string | null;
+  age?: number | null;
+  // 必要に応じて他のプロパティも追加
+};
+
 type Comment = {
   id: string;
   post_id: string;
@@ -19,6 +29,7 @@ type Comment = {
   content: string;
   created_at: string;
   profiles: {
+    id: string;
     username: string | null;
     avatar_url: string | null;
   } | null;
@@ -33,12 +44,7 @@ type Post = {
   user_id: string;
   content: string;
   created_at: string;
-  profiles: {
-    username: string | null;
-    avatar_url: string | null;
-    location: string | null;
-    age: number | null;
-  } | null;
+  profiles: Profile | null;
   comments: Comment[];
 };
 
@@ -58,6 +64,8 @@ const TimelinePage: NextPage = () => {
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [newCommentContent, setNewCommentContent] = useState('');
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   const fetcher = useCallback(async () => {
@@ -105,7 +113,7 @@ const TimelinePage: NextPage = () => {
   useEffect(() => {
     const hash = router.asPath.split('#')[1];
     if (hash) {
-      const postExists = items?.some((item) => item.item_type === 'post' && item.id === hash);
+      const postExists = Array.isArray(items) && items.some((item) => item.item_type === 'post' && item.id === hash);
       if (postExists) {
         setCommentingPostId(hash);
         // レンダリング後にスクロール
@@ -144,7 +152,7 @@ const TimelinePage: NextPage = () => {
         const newPost = payload.new as Post;
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, avatar_url, location, age')
+          .select('id, username, avatar_url, location, age')
           .eq('id', newPost.user_id)
           .single();
         mutate((currentItems = []) => {
@@ -162,7 +170,7 @@ const TimelinePage: NextPage = () => {
         const newComment = payload.new as Comment;
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, avatar_url, location, age')
+          .select('id, username, avatar_url, location, age')
           .eq('id', newComment.user_id)
           .single();
 
@@ -268,6 +276,25 @@ const TimelinePage: NextPage = () => {
     }
   };
 
+  const handleBlockConfirm = async () => {
+    if (!user || !userToBlock) return;
+
+    const { error } = await supabase.rpc('create_mutual_block', {
+      p_blocker_id: user.id,
+      p_blocked_id: userToBlock.id,
+    });
+
+    if (error) {
+      console.error('Error blocking user:', error);
+      alert('ブロック処理に失敗しました。');
+    } else {
+      // UIからブロックしたユーザーの投稿とコメントをすべて削除
+      mutate((currentItems = []) => currentItems.filter((item) => item.user_id !== userToBlock.id), false);
+      alert(`${userToBlock.username || '匿名さん'}さんをブロックしました。`);
+    }
+    setUserToBlock(null);
+  };
+
   return (
     <div className="bg-gray-900 min-h-screen text-white">
       <main className="p-4">
@@ -370,6 +397,17 @@ const TimelinePage: NextPage = () => {
                                       className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700"
                                     >
                                       削除
+                                    </button>
+                                  )}
+                                  {user && user.id !== post.user_id && (
+                                    <button
+                                      onClick={() => {
+                                        setOpenMenuPostId(null);
+                                        setUserToBlock(post.profiles);
+                                      }}
+                                      className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700"
+                                    >
+                                      ブロック
                                     </button>
                                   )}
                                   <button

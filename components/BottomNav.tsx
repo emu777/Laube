@@ -13,7 +13,7 @@ const BottomNav = ({ unreadNotificationCount }: BottomNavProps) => {
     { href: '/', icon: <FaHeart />, label: '出会い' },
     { href: '/timeline', icon: <FaStream />, label: 'タイムライン' },
     { href: '/recommendations', icon: <FaStar />, label: 'オススメ' },
-    { href: '/chats', icon: <FaComments />, label: 'トーク' },
+    { href: '/friends', icon: <FaComments />, label: 'トーク' },
     { href: '/notifications', icon: <FaBell />, label: '通知' },
   ];
 
@@ -28,7 +28,14 @@ const BottomNav = ({ unreadNotificationCount }: BottomNavProps) => {
               router.pathname === item.href ? 'text-pink-500' : 'text-gray-400 hover:text-white'
             }`}
           >
-            <div className="text-xl mb-1">{item.icon}</div>
+            <div className="relative text-xl mb-1">
+              {item.icon}
+              {item.href === '/notifications' && unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-white text-[10px] font-bold">
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
+            </div>
             <span>{item.label}</span>
           </Link>
         ))}

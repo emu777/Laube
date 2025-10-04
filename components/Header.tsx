@@ -90,7 +90,7 @@ const Header = () => {
               </li>
               <li>
                 <Link
-                  href="/friends"
+                  href="/matches"
                   className="block px-4 py-3 text-white no-underline rounded hover:bg-gray-700"
                   onClick={() => setIsOpen(false)}
                 >

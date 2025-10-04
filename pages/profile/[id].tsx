@@ -220,8 +220,8 @@ const ProfilePage: NextPage = () => {
     router.push('/');
   };
 
-  // データ取得中、または表示に必要なIDが未確定の間はローディング画面を表示
-  if (isLoading || !profileId || !user) {
+  // データ取得中、または表示に必要な情報が未確定の間はローディング画面を表示
+  if (isLoading || !profileId || !user || !data) {
     return <PageLoader />;
   }
 

@@ -51,6 +51,7 @@ const RecommendationsPage: NextPage = () => {
   const [newComment, setNewComment] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
   const fetcher = useCallback(async () => {
     if (!user) return [];
@@ -168,7 +169,24 @@ const RecommendationsPage: NextPage = () => {
                     key={rec.id}
                     className="bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden shadow-md"
                   >
-                    <div className="aspect-video relative">
+                    <div className="aspect-video relative group">
+                      {/* 再生ボタン付きのオーバーレイ */}
+                      <div
+                        className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        onClick={() => setPlayingVideoId(videoId)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="動画を再生"
+                      >
+                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      {/* iframeはタッチイベントを無効化 */}
                       <iframe
                         width="100%"
                         height="100%"
@@ -177,6 +195,7 @@ const RecommendationsPage: NextPage = () => {
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
+                        className="pointer-events-none"
                       ></iframe>
                     </div>
                     <div className="p-4">
@@ -186,24 +205,68 @@ const RecommendationsPage: NextPage = () => {
                         </span>
                       )}
                       <div className="flex items-center gap-2">
-                        <Link href={`/profile/${rec.user_id}`}>
-                          <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
-                        </Link>
-                        <Link
-                          href={`/profile/${rec.user_id}`}
-                          className="text-xs text-gray-400 hover:text-white transition-colors"
-                        >
-                          {rec.profiles?.username || '匿名さん'}
-                          のオススメ
-                        </Link>
+                        {user?.id === rec.user_id ? (
+                          <>
+                            <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
+                            <span className="text-xs text-gray-400">
+                              {rec.profiles?.username || '匿名さん'}
+                              のオススメ
+                            </span>
+                          </>
+                        ) : (
+                          <Link href={`/profile/${rec.user_id}`} className="flex items-center gap-2">
+                            <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
+                            <span className="text-xs text-gray-400 hover:text-white transition-colors">
+                              {rec.profiles?.username || '匿名さん'}
+                              のオススメ
+                            </span>
+                          </Link>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-300 whitespace-pre-wrap mt-2">{rec.comment}</p>
+                      <p className="text-xs text-gray-300 whitespace-pre-wrap mt-2 leading-relaxed">{rec.comment}</p>
                     </div>
                   </div>
                 ) : null;
               })}
           </div>
         </div>
+
+        {/* 動画再生モーダル */}
+        {playingVideoId && (
+          <div
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setPlayingVideoId(null)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="relative w-full max-w-3xl aspect-video bg-black rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setPlayingVideoId(null)}
+                className="absolute -top-2 -right-2 z-10 bg-gray-800 text-white rounded-full p-1.5 hover:bg-gray-700"
+                aria-label="閉じる"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+              <iframe
+                className="w-full h-full rounded-lg"
+                src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1`}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* 投稿フォームモーダル */}

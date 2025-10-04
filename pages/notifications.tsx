@@ -53,7 +53,7 @@ const getNotificationInfo = (notification: Notification) => {
     case 'comment':
       return {
         icon: <FaComment className="text-blue-400" />,
-        message: `「${notification.content_preview?.substring(0, 20)}...」に${senderName}さんからコメントが届きました`,
+        message: `${senderName}さんからコメントが届いています`,
         href: `/timeline#${notification.reference_id}`, // アンカーリンクで投稿に飛ぶ
       };
     case 'message':
@@ -79,31 +79,56 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
     fallbackData: serverNotifications,
   });
 
-  const handleNotificationClick = async (notification: Notification & { href: string }) => {
-    // 楽観的UI更新: クリックされた通知をis_read: trueにして即時反映
-    mutate(
-      (currentNotifications: DisplayNotification[] | undefined) => {
-        // Ensure we are always working with an array
+  const handleNotificationClick = (notification: DisplayNotification & { href: string }) => {
+    // --- 楽観的UI更新 ---
+    // グループ化された「いいね」通知の場合
+    if (isGroupedNotification(notification) && notification.type === 'like') {
+      // UIから「いいね」のグループ通知を削除
+      mutate((currentNotifications: DisplayNotification[] | undefined) => {
         const notificationsArray = Array.isArray(currentNotifications) ? currentNotifications : [];
-        return notificationsArray.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n));
-      },
-      false // 再検証はしない
-    );
+        return notificationsArray.filter((n) => {
+          if (isGroupedNotification(n)) {
+            return n.type !== 'like';
+          }
+          return true;
+        });
+      }, false);
 
-    // サーバー側で既読更新と削除を非同期で実行
-    (async () => {
-      if (!notification.is_read) {
+      // サーバー側で関連する未読通知をすべて既読に更新
+      (async () => {
+        const unreadSenderIds = notification.senders.filter((s) => !s.is_read).map((s) => s?.id);
         const { error: updateError } = await supabase
           .from('notifications')
           .update({ is_read: true })
-          .eq('id', notification.id);
+          .eq('type', 'like')
+          .in('sender_id', unreadSenderIds);
         if (updateError) {
-          console.error('Error updating notification:', updateError);
-          // 更新に失敗した場合、キャッシュを再検証してUIを元に戻す
-          mutate('notifications');
+          console.error('Error updating like notifications:', updateError);
+          mutate('notifications'); // エラー時はSWRキャッシュを再検証してUIを元に戻す
         }
+      })();
+    } else {
+      // 個別の通知の場合
+      // UIからクリックされた通知を削除
+      mutate((currentNotifications: DisplayNotification[] | undefined) => {
+        const notificationsArray = Array.isArray(currentNotifications) ? currentNotifications : [];
+        return notificationsArray.filter((n) => n.id !== notification.id);
+      }, false);
+
+      // まだ読んでいない通知の場合のみ、サーバーに既読更新をリクエスト
+      if (!notification.is_read) {
+        (async () => {
+          const { error: updateError } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', notification.id);
+          if (updateError) {
+            console.error('Error updating notification:', updateError);
+            mutate('notifications'); // エラー時はUIを元に戻す
+          }
+        })();
       }
-    })();
+    }
 
     router.push(notification.href);
   };
@@ -121,13 +146,19 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
                   const { icon, href } = getNotificationInfo(notification);
                   const latestSender = notification.sender;
                   const otherSendersCount = notification.count > 1 ? notification.count - 1 : 0; // 1件の場合は「他0人」と表示しない
-                  const message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}があなたの事を気になっています`;
+                  let message = '';
+                  if (notification.type === 'like') {
+                    message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}があなたに興味を持っています`;
+                  } else if (notification.type === 'comment') {
+                    message = `${latestSender?.username || '匿名さん'}さん${otherSendersCount > 0 ? ` 他${otherSendersCount}人` : ''}からコメントが届いています`;
+                  }
+
                   const isUnread = notification.senders.some((s) => !s.is_read);
 
                   return (
                     <div
                       key={notification.type + (notification.type === 'comment' ? notification.reference_id : '')}
-                      onClick={() => router.push(href)}
+                      onClick={() => handleNotificationClick({ ...notification, href })}
                       className={`flex items-center gap-4 p-4 rounded-xl transition-colors cursor-pointer ${
                         isUnread ? 'bg-pink-900/20 border border-pink-800/50' : 'bg-gray-800/50'
                       } hover:bg-gray-700/60`}

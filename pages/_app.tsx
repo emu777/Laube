@@ -164,23 +164,19 @@ const AppContent = ({ Component, pageProps }: AppProps) => {
   }, []);
 
   // プルリフレッシュを無効化するページのパスを定義
-  const noPullToRefreshPaths = ['/profile/', '/chat/', '/notifications', '/account', '/settings', '/login', '/logout'];
+  const noPullToRefreshPaths = ['/chat/', '/notifications', '/account', '/settings', '/login', '/logout'];
   // 現在のパスが上記リストのいずれかで始まるかチェック
-  const usePullToRefresh = !noPullToRefreshPaths.some((path) => router.pathname.startsWith(path));
+  // `/profile/[id]` のような動的なパスも無効化の対象に含める
+  const usePullToRefresh =
+    !noPullToRefreshPaths.some((path) => router.pathname.startsWith(path)) && !/^\/profile\/.+/.test(router.pathname);
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
-      <Header />
-      <main className="pt-20 pb-24">
-        {usePullToRefresh ? (
-          <DynamicPullToRefresh onRefresh={handleRefresh}>
-            {loading ? <PageLoader /> : <Component {...pageProps} />}
-          </DynamicPullToRefresh>
-        ) : loading ? (
-          <PageLoader />
-        ) : (
-          <Component {...pageProps} />
-        )}
+      {/* チャットページではグローバルヘッダーを非表示にする */}
+      {!router.pathname.startsWith('/chat/') && <Header />}
+      {/* チャットページではpadding-topを無効にする */}
+      <main className={router.pathname.startsWith('/chat/') ? 'pb-24' : 'pt-20 pb-24'}>
+        {loading ? <PageLoader /> : <Component {...pageProps} />}
       </main>
       {router.pathname.startsWith('/chat/') ? null : <BottomNav unreadNotificationCount={unreadNotificationCount} />}
     </div>
