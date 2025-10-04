@@ -79,15 +79,18 @@ export default function MyApp({
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        // ログインが成功した場合、ページを完全にリロードしてトップに遷移
-        // これにより、サーバーサイドで最新のセッション情報を使ってデータが再取得される
-        window.location.assign('/');
+      // Google認証などのOAuthプロバイダからのリダイレクト後、
+      // URLのハッシュ(#)にアクセストークンが含まれている場合にSIGNED_INイベントが発生します。
+      // このタイミングで一度だけトップページに遷移させ、URLからハッシュを消去します。
+      // window.location.assign('/') を使うと無限リロードの原因になることがあるため、
+      // router.push('/') を使用します。
+      if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+        router.push('/');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []); // このuseEffectはsupabaseClientに依存しますが、一度だけ実行されれば良いので空の依存配列でOK
+  }, [router]); // routerオブジェクトを依存配列に追加
 
   // NavigationGuardContext の実装
   const navigationGuardContextValue = {
