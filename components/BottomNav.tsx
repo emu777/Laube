@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FaHeart, FaStream, FaStar, FaComments, FaBell } from 'react-icons/fa';
-import { useNavigationGuard } from '@/pages/_app'; // Import the new hook
 
 type BottomNavProps = {
   unreadNotificationCount: number;
@@ -9,17 +8,6 @@ type BottomNavProps = {
 
 const BottomNav = ({ unreadNotificationCount }: BottomNavProps) => {
   const router = useRouter();
-  const { triggerNavigationGuard } = useNavigationGuard(); // Use the new hook
-
-  const handleNavigation = async (e: React.MouseEvent, href: string) => {
-    e.preventDefault(); // Prevent default Link behavior initially
-
-    // Trigger the navigation guard. If it returns false, navigation is cancelled.
-    const canNavigate = await triggerNavigationGuard(href);
-    if (canNavigate) {
-      router.push(href);
-    }
-  };
 
   const navItems = [
     { href: '/', icon: <FaHeart />, label: '出会い' },
@@ -36,7 +24,6 @@ const BottomNav = ({ unreadNotificationCount }: BottomNavProps) => {
           <Link
             key={item.href}
             href={item.href}
-            onClick={(e) => handleNavigation(e, item.href)} // Use the custom handler
             className={`flex flex-col items-center justify-center text-xs transition-colors duration-200 ${
               router.pathname === item.href ? 'text-pink-500' : 'text-gray-400 hover:text-white'
             }`}

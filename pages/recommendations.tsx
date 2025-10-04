@@ -19,6 +19,7 @@ type Recommendation = {
   profiles: {
     username: string | null;
     avatar_url: string | null;
+    id: string; // プロフィールIDも取得するように型定義を追加
   } | null;
 };
 
@@ -70,7 +71,7 @@ const RecommendationsPage: NextPage = () => {
     // 2. オススメを取得 (ブロックしたユーザーは除外)
     let recommendationsQuery = supabase
       .from('recommendations')
-      .select('*, category, profiles(username, avatar_url)')
+      .select('*, category, profiles(id, username, avatar_url)') // profilesテーブルからidも取得
       .order('created_at', { ascending: false });
     if (blockedUserIds.size > 0) {
       recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
@@ -176,7 +177,6 @@ const RecommendationsPage: NextPage = () => {
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
-                        className="pointer-events-none"
                       ></iframe>
                     </div>
                     <div className="p-4">
@@ -193,8 +193,8 @@ const RecommendationsPage: NextPage = () => {
                           href={`/profile/${rec.user_id}`}
                           className="text-xs text-gray-400 hover:text-white transition-colors"
                         >
-                          <span>{rec.profiles?.username || '匿名さん'}</span>
-                          <span>のオススメ</span>
+                          {rec.profiles?.username || '匿名さん'}
+                          のオススメ
                         </Link>
                       </div>
                       <p className="text-sm text-gray-300 whitespace-pre-wrap mt-2">{rec.comment}</p>

@@ -6,7 +6,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import dynamic from 'next/dynamic';
 import PageLoader from '@/components/PageLoader';
-import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext'; // useNotifications に修正
+import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
@@ -60,7 +60,7 @@ export const useNavigationGuard = () => {
 };
 // --- End New NavigationGuardContext ---
 
-// react-pull-to-refresh は window オブジェクトに依存するため、クライアントサイドでのみ読み込む
+// react-pull-to-refresh は window オブジェクトに依存するため、クライアントサイドでのみ動的に読み込みます
 const DynamicPullToRefresh = dynamic(() => import('react-pull-to-refresh'), {
   ssr: false,
 });
@@ -163,24 +163,15 @@ const AppContent = ({ Component, pageProps }: AppProps) => {
     window.location.reload();
   }, []);
 
-  const usePullToRefresh = !['/profile/', '/chat/', '/notifications', '/account', '/settings'].some((path) =>
-    router.pathname.startsWith(path)
-  );
+  // プルリフレッシュを無効化するページのパスを定義
+  const noPullToRefreshPaths = ['/profile/', '/chat/', '/notifications', '/account', '/settings', '/login', '/logout'];
+  // 現在のパスが上記リストのいずれかで始まるかチェック
+  const usePullToRefresh = !noPullToRefreshPaths.some((path) => router.pathname.startsWith(path));
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
       <Header />
-      <main className="pt-20 pb-24">
-        {usePullToRefresh ? (
-          <DynamicPullToRefresh onRefresh={handleRefresh}>
-            {loading ? <PageLoader /> : <Component {...pageProps} />}
-          </DynamicPullToRefresh>
-        ) : loading ? (
-          <PageLoader />
-        ) : (
-          <Component {...pageProps} />
-        )}
-      </main>
+      <main className="pt-20 pb-24">{loading ? <PageLoader /> : <Component {...pageProps} />}</main>
       {router.pathname.startsWith('/chat/') ? null : <BottomNav unreadNotificationCount={unreadNotificationCount} />}
     </div>
   );
