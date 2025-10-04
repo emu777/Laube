@@ -52,8 +52,12 @@ export default function MyApp({
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      // ログアウト時は Header の方でリダイレクトするため、ここでは何もしない
+    } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      // メールアドレスでのログイン・新規登録が成功した場合、手動でリダイレクト
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/');
+      }
+      // ログアウトは/logoutページで処理するため、ここでは何もしない
     });
 
     return () => subscription.unsubscribe();
