@@ -1,10 +1,11 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { useSession, useSupabase } from '@/pages/_app';
+import { useSupabase } from '@/pages/_app';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
 import { serialize, parse } from 'cookie';
 import AvatarIcon from '@/components/AvatarIcon';
+import { Session } from '@supabase/supabase-js';
 
 type Profile = {
   id: string;
@@ -29,11 +30,19 @@ type ChatRoomPageProps = {
 
 const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser, roomId }) => {
   const supabase = useSupabase();
-  const session = useSession();
+  const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    };
+    fetchSession();
+  }, [supabase]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,7 +111,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
 
     const { error } = await supabase // prettier-ignore
       .from('messages')
-      .insert({ content: newMessage, room_id: roomId, sender_id: user.id });
+      .insert({ content: newMessage, room_id: roomId, sender_id: session.user.id });
 
     if (error) {
       console.error('Error sending message:', error);
@@ -124,7 +133,7 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
         // prettier-ignore
         body: {
           recipient_id: otherUser.id,
-          title: `${user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
+          title: `${session.user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
           body: newMessage.substring(0, 50),
           tag: `chat-${roomId}`,
           href: `/chat/${roomId}`,
