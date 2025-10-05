@@ -35,32 +35,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const sftp = new SftpClient();
   try {
+    // form.parse()をtryブロックの中に移動
     const form = new Formidable();
     const [fields, files] = await form.parse(req);
-
     const file = files.file?.[0];
     if (!file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
+      return res.status(400).json({ error: 'ファイルがアップロードされていません。' });
     }
 
     // 一意のファイル名を生成
     const fileExt = path.extname(file.originalFilename || 'file');
     const fileName = `${user.id}-${Date.now()}${fileExt}`;
-    const remotePath = `${process.env.XSERVER_UPLOAD_PATH}/${fileName}`;
+    const remotePath = path.join(process.env.XSERVER_UPLOAD_PATH!, fileName);
 
     // SFTPクライアントの設定
-    const sftp = new SftpClient();
-    await sftp.connect({
-      host: process.env.XSERVER_HOST,
-      port: parseInt(process.env.XSERVER_PORT || '22', 10),
-      username: process.env.XSERVER_USER,
-      password: process.env.XSERVER_PASSWORD,
-    });
+    try {
+      await sftp.connect({
+        host: process.env.XSERVER_HOST,
+        port: parseInt(process.env.XSERVER_PORT || '22', 10),
+        username: process.env.XSERVER_USER,
+        password: process.env.XSERVER_PASSWORD,
+      });
+    } catch (connectError) {
+      console.error('SFTP Connection Error:', connectError);
+      throw new Error('SFTPサーバーへの接続に失敗しました。ホスト名、ユーザー名、パスワードを確認してください。');
+    }
 
     // ファイルをXserverにアップロード
-    const data = fs.createReadStream(file.filepath);
-    await sftp.put(data, remotePath);
+    try {
+      const data = fs.createReadStream(file.filepath);
+      await sftp.put(data, remotePath);
+    } catch (uploadError) {
+      console.error('SFTP Upload Error:', uploadError);
+      throw new Error('SFTPサーバーへのファイルアップロードに失敗しました。アップロードパスを確認してください。');
+    }
+
     await sftp.end();
 
     // アップロードされたファイルの公開URLを生成
@@ -68,8 +79,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // クライアントに公開URLを返す
     res.status(200).json({ url: publicUrl });
-  } catch (error) {
-    console.error('File upload error:', error);
-    res.status(500).json({ error: 'Failed to upload file.' });
+  } catch (error: unknown) {
+    console.error('An unexpected error occurred in /api/upload-avatar:', error);
+    await sftp.end(); // 接続があれば閉じ、なければ何もしない
+    let errorMessage = 'ファイルのアップロードに失敗しました。';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    res.status(500).json({ error: errorMessage });
   }
 }
