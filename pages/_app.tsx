@@ -84,8 +84,16 @@ export default function MyApp({
       // このタイミングで一度だけトップページに遷移させ、URLからハッシュを消去します。
       // window.location.assign('/') を使うと無限リロードの原因になることがあるため、
       // router.push('/') を使用します。
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        // ログインまたはログアウト時にページをリフレッシュして、サーバーとクライアントの認証状態を同期させる
+      if (event === 'SIGNED_IN') {
+        // Google認証からのリダイレクト直後（URLにaccess_tokenがある）はページをリロードしてセッションを確実に同期
+        if (window.location.hash.includes('access_token')) {
+          window.location.reload();
+        } else {
+          // メール認証後などは現在のページを再取得して同期
+          router.replace(router.asPath);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        // ログアウト時もページの再取得を行い、ログインページへリダイレクトさせる
         router.replace(router.asPath);
       }
     });
