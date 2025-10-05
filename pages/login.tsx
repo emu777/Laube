@@ -7,15 +7,17 @@ import { useRouter } from 'next/router';
 import { useSupabase } from './_app';
 import { useState, useEffect } from 'react';
 
-type LoginPageProps = {
-  redirectTo: string;
-};
-
-const Login: NextPage<LoginPageProps> = ({ redirectTo }) => {
+const Login: NextPage = () => {
   const supabase = useSupabase();
   const router = useRouter();
   const { view } = router.query;
+  const [redirectTo, setRedirectTo] = useState<string | undefined>(undefined);
 
+  useEffect(() => {
+    // クライアントサイドでのみ window.location.origin を取得して redirectTo を設定
+    // これにより、どの環境でも正しいリダイレクトURLが保証される
+    setRedirectTo(window.location.origin);
+  }, []);
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-900 p-4">
       <div className="w-full max-w-md mx-auto">
@@ -116,15 +118,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     };
   }
 
-  // Google認証後のリダイレクトURLを生成
-  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  const host = ctx.req.headers.host || 'localhost:3000';
-  const redirectTo = `${protocol}://${host}`;
-
   return {
     props: {
       initialSession: null, // This prop is not used, setting to null
-      redirectTo,
     },
   };
 };
