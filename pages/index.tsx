@@ -32,16 +32,22 @@ type LikedByUser = {
 };
 
 type HomePageProps = {
+  initialProfiles: Profile[];
   isNewUser: boolean;
 };
 
-const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
+const Home: NextPage<HomePageProps> = ({ initialProfiles, isNewUser }) => {
   const supabase = useSupabase();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
 
+  const handleCloseModalAndRedirect = () => {
+    setShowAddToHomeScreenModal(false);
+    alert('アカウントご登録ありがとうございます！最初にプロフィールのご入力をお願いします。');
+    router.push('/account');
+  };
+
+  const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -59,37 +65,6 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   }, [isNewUser]);
 
   const [showAllLikedBy, setShowAllLikedBy] = useState(false);
-
-  // プロフィール一覧を取得するfetcher
-  const profilesFetcher = useCallback(async () => {
-    console.log('[Home] profilesFetcher が実行されました。user:', user ? user.id : 'null');
-    if (!user) throw new Error('Not authenticated');
-
-    const { data: blocksData } = await supabase
-      .from('blocks')
-      .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-    const blockedUserIds = new Set<string>();
-    if (blocksData) {
-      for (const block of blocksData) {
-        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
-      }
-    }
-
-    let profilesQuery = supabase
-      .from('profiles')
-      .select('id, username, avatar_url, location, age, last_seen, hobbies, bio')
-      .neq('id', user.id)
-      .not('username', 'is', null);
-    if (blockedUserIds.size > 0) {
-      profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
-    }
-    const { data, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
-    if (error) throw error;
-    console.log('[Home] プロフィールデータを取得しました:', data.length, '件');
-    return data;
-  }, [supabase, user]);
 
   // 片思いユーザーを取得するfetcher
   const likedByUsersFetcher = useCallback(async () => {
@@ -144,21 +119,19 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     }));
   }, [supabase, user]);
 
-  const handleCloseModalAndRedirect = () => {
-    setShowAddToHomeScreenModal(false);
-    alert('アカウントご登録ありがとうございます！最初にプロフィールのご入力をお願いします。');
-    router.push('/account');
-  };
-
-  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(
-    user ? `profiles_${user.id}` : null, // userが存在する場合のみfetcherを実行
-    profilesFetcher,
-    {}
-  );
   const { data: likedByUsers } = useSWR<LikedByUser[]>(
     user ? `likedByUsers_${user.id}` : null, // userが存在する場合のみfetcherを実行
     likedByUsersFetcher,
     {}
+  );
+
+  // サーバーから渡された初期プロフィールリストをSWRで管理
+  const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(
+    'profiles',
+    () => Promise.resolve(initialProfiles),
+    {
+      fallbackData: initialProfiles,
+    }
   );
 
   return (
@@ -314,8 +287,35 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   // ログインユーザーのプロフィールを取得して新規ユーザーか判定
   const { data: userProfile } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
 
+  // --- ここからデータ取得ロジックを追加 ---
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+      if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+    }
+  }
+
+  // 2. プロフィール一覧を取得 (ブロックしたユーザーは除外)
+  let profilesQuery = supabase.from('profiles').select('*').neq('id', user.id).not('username', 'is', null);
+  if (blockedUserIds.size > 0) {
+    profilesQuery = profilesQuery.not('id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+  }
+  const { data: profilesData, error: profilesError } = await profilesQuery.order('last_seen', {
+    ascending: false,
+    nullsFirst: false,
+  });
+  if (profilesError) console.error('Error fetching profiles:', profilesError);
+  // --- ここまで ---
+
   return {
     props: {
+      initialProfiles: profilesData || [],
       isNewUser: !userProfile?.username,
     },
   };
