@@ -25,6 +25,6 @@
     ],
     "types": ["node"]
   },
-  "include": ["**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
+  "include": ["**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts", "react-swipeable-list.d.ts"],
   "exclude": ["node_modules", "supabase/functions"]
 }
