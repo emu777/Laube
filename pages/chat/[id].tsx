@@ -3,7 +3,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSupabase } from '@/pages/_app';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
-import { parse } from 'cookie';
+import { serialize, parse } from 'cookie';
 import AvatarIcon from '@/components/AvatarIcon';
 import type { User } from '@supabase/supabase-js';
 

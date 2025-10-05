@@ -41,12 +41,18 @@ const getYouTubeVideoId = (url: string): string | null => {
 const RecommendationsPage: NextPage = () => {
   const supabase = useSupabase();
   const router = useRouter();
-  const { data: userData } = useSWR('user', async () => {
-    const { data } = await supabase.auth.getUser();
-    return data.user;
-  });
-  const user = userData;
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
+
+  const [user, setUser] = useState<User | null>(null);
   const [newUrl, setNewUrl] = useState('');
   const [newComment, setNewComment] = useState('');
   const [newCategory, setNewCategory] = useState('');

@@ -53,21 +53,25 @@ type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'co
 const TimelinePage: NextPage = () => {
   const supabase = useSupabase();
   const router = useRouter();
-  const { data: userData } = useSWR('user', async () => {
-    const { data } = await supabase.auth.getUser();
-    return data.user;
-  });
-  const user = userData;
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
+
+  const [user, setUser] = useState<User | null>(null);
   const [newPostContent, setNewPostContent] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [newCommentContent, setNewCommentContent] = useState('');
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
-
   const menuRef = useRef<HTMLDivElement>(null);
-
   const fetcher = useCallback(async () => {
     if (!user) return [];
 
@@ -107,7 +111,7 @@ const TimelinePage: NextPage = () => {
     error,
     isLoading,
     mutate,
-  } = useSWR<TimelineItem[]>(user ? `timeline_items_${user.id}` : null, fetcher, {});
+  } = useSWR<TimelineItem[]>(user ? `timeline_items_${user.id}` : null, fetcher);
 
   // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {

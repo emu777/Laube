@@ -52,7 +52,7 @@ const ProfilePage: NextPage = () => {
   // profileId と user.id の両方が利用可能になってからSWRキーを生成し、fetcherを実行する
   const swrKey = profileId && user ? `profile_${profileId}_${user.id}` : null;
   const { data, error, isLoading } = useSWR(swrKey, fetcher, {
-    revalidateOnFocus: false, // 画面フォーカス時の自動再検証を無効化
+    revalidateOnFocus: false,
   });
 
   const { profile, isLikedBy, isMyProfile } = data || {};

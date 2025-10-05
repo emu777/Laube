@@ -38,13 +38,19 @@ type HomePageProps = {
 const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   const supabase = useSupabase();
   const router = useRouter();
-  const { data: userData } = useSWR('user', async () => {
-    const { data } = await supabase.auth.getUser();
-    return data.user;
-  });
-  const user = userData;
+  const [user, setUser] = useState<User | null>(null);
 
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+  }, [supabase]);
 
   useEffect(() => {
     if (isNewUser) {
@@ -56,6 +62,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
 
   // プロフィール一覧を取得するfetcher
   const profilesFetcher = useCallback(async () => {
+    console.log('[Home] profilesFetcher が実行されました。user:', user ? user.id : 'null');
     if (!user) throw new Error('Not authenticated');
 
     const { data: blocksData } = await supabase
@@ -80,6 +87,7 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
     }
     const { data, error } = await profilesQuery.order('last_seen', { ascending: false, nullsFirst: false });
     if (error) throw error;
+    console.log('[Home] プロフィールデータを取得しました:', data.length, '件');
     return data;
   }, [supabase, user]);
 
@@ -143,12 +151,12 @@ const Home: NextPage<HomePageProps> = ({ isNewUser }) => {
   };
 
   const { data: profiles, isLoading: isLoadingProfiles } = useSWR<Profile[]>(
-    user ? `profiles_${user.id}` : null,
+    user ? `profiles_${user.id}` : null, // userが存在する場合のみfetcherを実行
     profilesFetcher,
     {}
   );
   const { data: likedByUsers } = useSWR<LikedByUser[]>(
-    user ? `likedByUsers_${user.id}` : null,
+    user ? `likedByUsers_${user.id}` : null, // userが存在する場合のみfetcherを実行
     likedByUsersFetcher,
     {}
   );
@@ -296,19 +304,15 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
   // ログインユーザーのプロフィールを取得して新規ユーザーか判定
-  const { data: userProfile } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', session.user.id)
-    .maybeSingle();
+  const { data: userProfile } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
 
   return {
     props: {

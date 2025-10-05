@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 import Head from 'next/head'; // Added for PWA theme-color and manifest
 import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
+import { useSWRConfig } from 'swr';
 import dynamic from 'next/dynamic';
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext';
@@ -70,6 +71,7 @@ export default function MyApp({
   const [supabaseClient] = useState(() =>
     createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   );
+  const { cache, mutate } = useSWRConfig();
   const [currentNavigationGuard, setCurrentNavigationGuard] = useState<NavigationGuardFunction | null>(null);
 
   // 認証状態の変更を監視し、変更があればページをリフレッシュする (クライアントサイドでのみ実行)
@@ -85,8 +87,6 @@ export default function MyApp({
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         // ログインまたはログアウト時にページをリフレッシュして、サーバーとクライアントの認証状態を同期させる
         router.replace(router.asPath);
-      } else if (event === 'SIGNED_OUT') {
-        router.push('/login');
       }
     });
 

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { GetServerSidePropsContext } from 'next';
 import { serialize, parse } from 'cookie';
+import { useRouter } from 'next/router';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { useSWRConfig } from 'swr';
 import { useSupabase } from './_app';
 import type { User } from '@supabase/supabase-js';
 import PageLayout from '@/components/PageLayout';
@@ -9,6 +11,8 @@ import Link from 'next/link';
 
 const SettingsPage = () => {
   const supabase = useSupabase();
+  const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [user, setUser] = useState<User | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -100,6 +104,11 @@ const SettingsPage = () => {
     }
   };
 
+  const handleLogout = async () => {
+    // ログアウト時にページをリロードして、クライアントの状態を完全にリセットする
+    window.location.href = '/logout';
+  };
+
   return (
     <PageLayout maxWidth="max-w-2xl">
       <div className="space-y-8 pb-10">
@@ -137,9 +146,12 @@ const SettingsPage = () => {
         </div>
         {/* ここからログアウトのセクションを追加 */}
         <div className="mt-8 pt-6 border-t border-gray-700 text-center">
-          <Link href="/logout" className="inline-block text-red-500 hover:text-red-400 transition-colors duration-200">
+          <button
+            onClick={handleLogout}
+            className="inline-block text-red-500 hover:text-red-400 transition-colors duration-200 bg-transparent border-none cursor-pointer"
+          >
             ログアウト
-          </Link>
+          </button>
         </div>
         {/* ここまで */}
       </div>
