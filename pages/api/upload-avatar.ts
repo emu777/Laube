@@ -57,6 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         port: parseInt(process.env.XSERVER_PORT || '22', 10),
         username: process.env.XSERVER_USER,
         password: process.env.XSERVER_PASSWORD,
+        readyTimeout: 20000, // 接続タイムアウトを20秒に設定
       });
     } catch (connectError) {
       console.error('SFTP Connection Error:', connectError);
