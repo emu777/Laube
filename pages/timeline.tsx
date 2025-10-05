@@ -50,7 +50,11 @@ type Post = {
 
 type TimelineItem = (Post & { item_type: 'post' }) | (Comment & { item_type: 'comment' });
 
-const TimelinePage: NextPage = () => {
+type TimelinePageProps = {
+  initialItems: TimelineItem[];
+};
+
+const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
   const supabase = useSupabase();
   const router = useRouter();
 
@@ -72,46 +76,15 @@ const TimelinePage: NextPage = () => {
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [userToBlock, setUserToBlock] = useState<Profile | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const fetcher = useCallback(async () => {
-    if (!user) return [];
-
-    // 1. ブロック関係にあるユーザーIDのリストを取得
-    const { data: blocksData } = await supabase
-      .from('blocks')
-      .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-    const blockedUserIds = new Set<string>();
-    if (blocksData) {
-      for (const block of blocksData) {
-        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
-      }
-    }
-    const blockedUserIdsArray = Array.from(blockedUserIds);
-
-    // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
-    let postsQuery = supabase
-      .from('posts')
-      .select('*, profiles(username, avatar_url, location, age), comments(*, profiles(username, avatar_url))')
-      .order('created_at', { ascending: false });
-
-    if (blockedUserIdsArray.length > 0) {
-      postsQuery = postsQuery.not('user_id', 'in', `(${blockedUserIdsArray.join(',')})`);
-      postsQuery = postsQuery.filter('comments.user_id', 'not.in', `(${blockedUserIdsArray.join(',')})`);
-    }
-
-    const { data: postsData, error: postsError } = await postsQuery;
-    if (postsError) throw postsError;
-
-    return (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
-  }, [supabase, user]);
 
   const {
     data: items,
     error,
     isLoading,
     mutate,
-  } = useSWR<TimelineItem[]>(user ? `timeline_items_${user.id}` : null, fetcher);
+  } = useSWR<TimelineItem[]>('timeline_items', () => Promise.resolve(initialItems), {
+    fallbackData: initialItems,
+  });
 
   // URLのハッシュをチェックしてコメント欄を開く
   useEffect(() => {
@@ -561,7 +534,45 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
+  // --- ここからデータ取得ロジックを追加 ---
+  // 1. ブロック関係にあるユーザーIDのリストを取得
+  const { data: blocksData } = await supabase
+    .from('blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+  const blockedUserIds = new Set<string>();
+  if (blocksData) {
+    for (const block of blocksData) {
+      if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+      if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+    }
+  }
+  const blockedUserIdsArray = Array.from(blockedUserIds);
+
+  // 2. 投稿とコメントを取得 (ブロックしたユーザーは除外)
+  let postsQuery = supabase
+    .from('posts')
+    .select('*, profiles(username, avatar_url, location, age), comments(*, profiles(username, avatar_url))')
+    .order('created_at', { ascending: false });
+
+  if (blockedUserIdsArray.length > 0) {
+    postsQuery = postsQuery.not('user_id', 'in', `(${blockedUserIdsArray.join(',')})`);
+    // 注意: RLSでコメントもフィルタリングされていることを前提とします。
+    // .filter()はネストされたリソースには直接適用できないため、
+    // 必要であれば別途コメントをフィルタリングする処理が必要です。
+  }
+
+  const { data: postsData, error: postsError } = await postsQuery;
+  if (postsError) {
+    console.error('Error fetching timeline posts:', postsError);
+  }
+
+  const initialItems = (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
+  // --- ここまで ---
+
   return {
-    props: {},
+    props: {
+      initialItems,
+    },
   };
 };

@@ -63,18 +63,22 @@ const FriendsPage: NextPage<FriendsPageProps> = ({ chatPartners }) => {
                     {friend.username || '未設定'}
                   </p>
                   {friend.last_message_at && (
-                    <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                      {formatDistanceToNow(new Date(friend.last_message_at), { addSuffix: true, locale: ja })}
-                    </p>
+                    <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                      <p className="text-xs text-gray-500">
+                        {formatDistanceToNow(new Date(friend.last_message_at), { addSuffix: true, locale: ja })}
+                      </p>
+                      {friend.unread_count > 0 && (
+                        <span className="mt-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-white text-xs font-bold">
+                          {friend.unread_count > 99 ? '99+' : friend.unread_count}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <p className={`text-sm truncate ${friend.unread_count > 0 ? 'text-gray-200' : 'text-gray-400'}`}>
                     {friend.last_message || 'まだメッセージはありません'}
                   </p>
-                  {friend.unread_count > 0 && (
-                    <span className="flex-shrink-0 ml-2 w-2.5 h-2.5 bg-blue-500 rounded-full"></span>
-                  )}
                 </div>
               </div>
             </Link>

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { GetServerSidePropsContext } from 'next';
 import { serialize, parse } from 'cookie';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import useSWR from 'swr';
 import { useSupabase } from './_app';
 import type { User } from '@supabase/supabase-js';
 import Avatar from '@/components/Avatar';
@@ -10,6 +9,8 @@ import PageLayout from '@/components/PageLayout';
 
 // プロフィールデータの型を定義します
 type Profile = {
+  id: string;
+  email: string | undefined;
   username: string | null;
   avatar_url: string | null;
   location: string | null;
@@ -27,28 +28,13 @@ type Profile = {
   mbti: string | null;
 };
 
-export default function Account() {
+type AccountPageProps = {
+  profile: Profile;
+};
+
+export default function Account({ profile: initialProfile }: AccountPageProps) {
   const supabase = useSupabase();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-    fetchUser();
-  }, [supabase]);
-
-  const fetcher = useCallback(async () => {
-    if (!user) return null;
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (error) throw error;
-    return data;
-  }, [supabase, user]);
-
-  const { data: profile, error, isLoading, mutate } = useSWR<Profile>(user ? 'profile' : null, fetcher);
-
-  const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState(initialProfile);
   const [username, setUsername] = useState<Profile['username']>('');
   const [avatar_url, setAvatarUrl] = useState<Profile['avatar_url']>(null);
   const [location, setLocation] = useState<Profile['location']>('');
@@ -86,6 +72,7 @@ export default function Account() {
   }, [profile]);
 
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const isFormInvalid = useMemo(() => {
     return (
@@ -106,6 +93,9 @@ export default function Account() {
   async function updateProfile(updates: Partial<Profile>, alertMessage: string = 'プロフを更新しました。') {
     try {
       setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('No user');
 
       const updatesWithTimestamp = {
@@ -113,16 +103,16 @@ export default function Account() {
         updated_at: new Date().toISOString(),
       };
 
-      console.log('プロフィール更新開始 (DB送信データ):', updates);
       // `id` を条件に、更新可能なデータのみを送信する
       const { error } = await supabase.from('profiles').update(updatesWithTimestamp).eq('id', user.id);
       if (error) throw error;
-      mutate(); // SWRのキャッシュを再検証してUIを更新
+      // サーバーから最新のプロフィール情報を再取得してUIを更新
+      const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (newProfile) setProfile(newProfile);
       alert(alertMessage);
-      console.log('プロフィール更新成功');
     } catch (error) {
       alert('プロフィールの更新中にエラーが発生しました。');
-      console.error('プロフィール更新エラー:', error);
+      console.error('Error updating profile:', error);
     } finally {
       setLoading(false);
     }
@@ -134,7 +124,7 @@ export default function Account() {
       return;
     }
     const updates: Partial<Profile> = {
-      username,
+      username: username,
       avatar_url, // avatar_urlを更新オブジェクトに含める
       location,
       sexualities,
@@ -295,7 +285,7 @@ export default function Account() {
     'ESFP',
   ];
 
-  if (isLoading || !user) return <PageLayout maxWidth="max-w-2xl">読み込み中...</PageLayout>;
+  if (!profile) return <PageLayout maxWidth="max-w-2xl">読み込み中...</PageLayout>;
 
   return (
     <PageLayout maxWidth="max-w-2xl">
@@ -304,12 +294,11 @@ export default function Account() {
 
         <div className="flex justify-center">
           <Avatar
-            uid={user.id}
+            uid={profile.id}
             url={avatar_url}
             size={150}
-            onUpload={(url) => {
-              setAvatarUrl(url);
-              updateProfile({ avatar_url: url }, 'プロフィール画像を更新しました。');
+            onUpload={(url: string) => {
+              setAvatarUrl(url); // UIを即時反映
             }}
           />
         </div>
@@ -665,7 +654,7 @@ export default function Account() {
               <input
                 id="email"
                 type="text"
-                value={user?.email || ''}
+                value={profile.email || ''}
                 autoComplete="email"
                 disabled
                 className="w-full p-3 text-gray-500 bg-gray-700/30 border border-gray-600 rounded-lg"
@@ -714,6 +703,15 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     return { redirect: { destination: '/login', permanent: false } };
   }
   return {
-    props: {},
+    props: {
+      profile: await (async () => {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        return {
+          ...profileData,
+          email: user.email, // emailをprofileオブジェクトに追加
+          id: user.id, // idもuserオブジェクトから取得して確実性を高める
+        };
+      })(),
+    },
   };
 };

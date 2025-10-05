@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useSupabase } from '@/pages/_app';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useSupabase } from '@/pages/_app';
 
 type AvatarIconProps = {
   avatarUrlPath: string | null | undefined;
@@ -10,12 +10,16 @@ type AvatarIconProps = {
 
 const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
   const supabase = useSupabase();
-  const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (avatarUrlPath) {
-      const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrlPath);
-      setPublicUrl(data.publicUrl);
+      if (avatarUrlPath.startsWith('http')) {
+        setImageUrl(avatarUrlPath);
+      } else {
+        const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrlPath);
+        setImageUrl(data.publicUrl);
+      }
     }
   }, [avatarUrlPath, supabase]);
 
@@ -25,8 +29,8 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
         className="rounded-full bg-gray-700 overflow-hidden border border-gray-800"
         style={{ width: size, height: size }}
       >
-        {publicUrl ? (
-          <Image src={publicUrl} alt="avatar" className="w-full h-full object-cover" width={size} height={size} />
+        {imageUrl ? (
+          <Image src={imageUrl} alt="avatar" className="w-full h-full object-cover" width={size} height={size} />
         ) : (
           <div className="w-full h-full bg-gray-700" />
         )}

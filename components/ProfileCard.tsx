@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useSupabase } from '@/pages/_app';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSupabase } from '@/pages/_app';
 
 type Profile = {
   id: string;
@@ -15,21 +14,23 @@ type Profile = {
 
 const ProfileCard = ({ profile }: { profile: Profile }) => {
   const supabase = useSupabase();
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (profile.avatar_url) {
-      const { data } = supabase.storage.from('avatars').getPublicUrl(profile.avatar_url);
-      setAvatarUrl(data.publicUrl);
-    }
-  }, [profile.avatar_url, supabase]);
 
   return (
     <Link href={`/profile/${profile.id}`} className="block transition-transform duration-200 hover:scale-105">
       <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[160px]">
         <div className="relative w-full aspect-square">
-          {avatarUrl ? (
-            <Image src={avatarUrl} alt="avatar" className="w-full h-full object-cover" fill sizes="150px" />
+          {profile.avatar_url ? (
+            <Image
+              src={
+                profile.avatar_url.startsWith('http')
+                  ? profile.avatar_url
+                  : supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data.publicUrl
+              }
+              alt="avatar"
+              className="w-full h-full object-cover"
+              fill
+              sizes="150px"
+            />
           ) : (
             <div className="w-full h-full bg-gray-700 flex items-center justify-center">
               <span className="text-gray-400">No image</span>

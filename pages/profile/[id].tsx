@@ -57,7 +57,6 @@ const ProfilePage: NextPage = () => {
 
   const { profile, isLikedBy, isMyProfile } = data || {};
 
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
@@ -80,13 +79,6 @@ const ProfilePage: NextPage = () => {
     };
     fetchUser();
   }, [supabase]);
-
-  useEffect(() => {
-    if (profile?.avatar_url) {
-      const { data } = supabase.storage.from('avatars').getPublicUrl(profile.avatar_url);
-      setAvatarUrl(data.publicUrl);
-    }
-  }, [profile, supabase]);
 
   const createChatRoom = async () => {
     if (!user || !profile) return;
@@ -301,9 +293,9 @@ const ProfilePage: NextPage = () => {
                   )}
                 </div>
               )}
-              {avatarUrl ? (
+              {profile.avatar_url ? (
                 <Image
-                  src={avatarUrl}
+                  src={profile.avatar_url}
                   alt="avatar"
                   className="w-full h-full object-cover"
                   fill

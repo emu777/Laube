@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSupabase } from '@/pages/_app';
 import Image from 'next/image';
 
@@ -18,62 +18,63 @@ export default function Avatar({
   onUpload: (filePath: string) => void;
 }) {
   const supabase = useSupabase();
-  const [avatarUrl, setAvatarUrl] = useState<Profile['avatar_url']>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const downloadImage = useCallback(
-    async (path: string) => {
-      try {
-        const { data, error } = await supabase.storage.from('avatars').download(path);
-        if (error) {
-          throw error;
-        }
-        const url = URL.createObjectURL(data);
-        setAvatarUrl(url);
-      } catch (error) {
-        console.log('Error downloading image: ', error);
-      }
-    },
-    [supabase]
-  );
-
   useEffect(() => {
-    if (url) downloadImage(url);
-  }, [url, downloadImage]);
+    if (url) {
+      if (url.startsWith('http')) {
+        setImageUrl(url);
+      } else {
+        const { data } = supabase.storage.from('avatars').getPublicUrl(url);
+        setImageUrl(data.publicUrl);
+      }
+    }
+  }, [url, supabase]);
 
   const uploadAvatar: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    console.log('uploadAvatar function triggered.');
     try {
       setUploading(true);
 
       if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
+        throw new Error('アップロードする画像を選択してください。');
       }
 
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${uid}-${Math.random()}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      // 新しく作成したAPIエンドポイントにファイルを送信
+      const response = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) {
-        throw uploadError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'アップロードに失敗しました。');
       }
 
-      onUpload(filePath);
+      const data = await response.json();
+      const newUrl = data.url;
+
+      console.log('Upload successful. Calling onUpload callback.');
+      onUpload(newUrl); // Xserver上の公開URLを渡す
     } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      }
+      console.error('An error occurred in uploadAvatar:', error);
+      alert('画像のアップロード中にエラーが発生しました。コンソールで詳細を確認してください。');
     } finally {
+      console.log('uploadAvatar function finished. Setting uploading to false.');
       setUploading(false);
     }
   };
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
-      {avatarUrl ? (
+      {imageUrl ? (
         <Image
-          src={avatarUrl}
+          src={imageUrl}
           alt="Avatar"
           className="w-full h-full rounded-full object-cover"
           width={size}

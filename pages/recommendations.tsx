@@ -23,24 +23,31 @@ type Recommendation = {
   } | null;
 };
 
+type RecommendationsPageProps = {
+  initialRecommendations: Recommendation[];
+};
+
 const getYouTubeVideoId = (url: string): string | null => {
   try {
     const urlObj = new URL(url);
-    if (urlObj.hostname === 'youtu.be') {
-      return urlObj.pathname.slice(1);
-    }
-    if (urlObj.hostname.includes('youtube.com')) {
-      return urlObj.searchParams.get('v');
-    }
-    return null;
-  } catch (error) {
-    return null;
+    if (urlObj.hostname === 'youtu.be') return urlObj.pathname.slice(1);
+    if (urlObj.hostname.includes('youtube.com')) return urlObj.searchParams.get('v');
+  } catch (e) {
+    // URLの解析に失敗した場合はnullを返す
   }
+  return null;
 };
 
-const RecommendationsPage: NextPage = () => {
+const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecommendations }) => {
   const supabase = useSupabase();
   const router = useRouter();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [newUrl, setNewUrl] = useState('');
+  const [newComment, setNewComment] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -52,47 +59,13 @@ const RecommendationsPage: NextPage = () => {
     fetchUser();
   }, [supabase]);
 
-  const [user, setUser] = useState<User | null>(null);
-  const [newUrl, setNewUrl] = useState('');
-  const [newComment, setNewComment] = useState('');
-  const [newCategory, setNewCategory] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
-
-  const fetcher = useCallback(async () => {
-    if (!user) return [];
-
-    // 1. ブロック関係にあるユーザーIDのリストを取得
-    const { data: blocksData } = await supabase
-      .from('blocks')
-      .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-    const blockedUserIds = new Set<string>();
-    if (blocksData) {
-      for (const block of blocksData) {
-        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
-      }
-    }
-
-    // 2. オススメを取得 (ブロックしたユーザーは除外)
-    let recommendationsQuery = supabase
-      .from('recommendations')
-      .select('*, category, profiles(id, username, avatar_url)') // profilesテーブルからidも取得
-      .order('created_at', { ascending: false });
-    if (blockedUserIds.size > 0) {
-      recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
-    }
-    const { data, error } = await recommendationsQuery;
-    if (error) throw error;
-    return data || [];
-  }, [supabase, user]);
-
   const {
     data: recommendations,
     isLoading,
     mutate,
-  } = useSWR<Recommendation[]>(user ? `recommendations_${user.id}` : null, fetcher);
+  } = useSWR<Recommendation[]>('recommendations', () => Promise.resolve(initialRecommendations), {
+    fallbackData: initialRecommendations,
+  });
 
   const handlePost = async () => {
     if (!newUrl.trim() || !user) {
@@ -396,6 +369,33 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   }
 
   return {
-    props: {},
+    props: {
+      initialRecommendations: await (async () => {
+        // 1. ブロック関係にあるユーザーIDのリストを取得
+        const { data: blocksData } = await supabase
+          .from('blocks')
+          .select('blocker_id,blocked_id')
+          .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+        const blockedUserIds = new Set<string>();
+        if (blocksData) {
+          for (const block of blocksData) {
+            if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
+            if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
+          }
+        }
+
+        // 2. オススメを取得 (ブロックしたユーザーは除外)
+        let recommendationsQuery = supabase
+          .from('recommendations')
+          .select('*, category, profiles(id, username, avatar_url)')
+          .order('created_at', { ascending: false });
+        if (blockedUserIds.size > 0) {
+          recommendationsQuery = recommendationsQuery.not('user_id', 'in', `(${Array.from(blockedUserIds).join(',')})`);
+        }
+        const { data, error } = await recommendationsQuery;
+        if (error) console.error('Error fetching recommendations:', error);
+        return data || [];
+      })(),
+    },
   };
 };
