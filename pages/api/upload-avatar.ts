@@ -60,7 +60,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         port: parseInt(process.env.XSERVER_PORT || '22', 10),
         username: process.env.XSERVER_USER,
         password: process.env.XSERVER_PASSWORD,
-        readyTimeout: 20000, // 接続タイムアウトを20秒に設定
+        readyTimeout: 20000, // 接続タイムアウトを20秒に設定,
+        debug: (msg: string) => console.log(`SFTP Debug: ${msg}`), // デバッグログを有効化
+        // Xserverで一般的にサポートされているアルゴリズムを明示的に指定
+        algorithms: {
+          serverHostKey: ['ssh-rsa', 'ecdsa-sha2-nistp256', 'ssh-dss'],
+          kex: ['diffie-hellman-group14-sha1', 'diffie-hellman-group-exchange-sha256'],
+        },
       });
     } catch (connectError) {
       console.error('SFTP Connection Error:', connectError);
