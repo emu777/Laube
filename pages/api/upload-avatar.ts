@@ -52,6 +52,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // SFTPクライアントの設定
     try {
+      // デバッグ用ログ：どのホストとユーザーで接続しようとしているか確認
+      console.log(`Attempting to connect to SFTP: host=${process.env.XSERVER_HOST}, user=${process.env.XSERVER_USER}`);
+
       await sftp.connect({
         host: process.env.XSERVER_HOST,
         port: parseInt(process.env.XSERVER_PORT || '22', 10),
