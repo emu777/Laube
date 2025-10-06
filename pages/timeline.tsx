@@ -283,7 +283,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
             {isLoading && null}
             {error && <div className="text-center py-10 text-red-400">読み込みに失敗しました。</div>}
             {items &&
-              items.map((item) => {
+              items.map((item, index) => {
                 if (item.item_type === 'comment') {
                   return (
                     <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
@@ -292,7 +292,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                           href={{ pathname: '/profile/[id]', query: { id: item.user_id } }}
                           className="flex-shrink-0 cursor-pointer"
                         >
-                          <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} />
+                          <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} priority={index < 3} />
                         </Link>
                         <div className="flex-1">
                           <div className="text-xs text-gray-400 mb-2">
@@ -329,7 +329,7 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                           href={{ pathname: '/profile/[id]', query: { id: post.user_id } }}
                           className="flex-shrink-0 cursor-pointer"
                         >
-                          <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} />
+                          <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} priority={index < 3} />
                         </Link>
                         <div className="flex-1 flex flex-col">
                           <div className="flex-1">
@@ -579,7 +579,12 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     console.error('Error fetching timeline posts:', postsError);
   }
 
-  const initialItems = (postsData || []).map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
+  // プロフィールが取得できなかった投稿やコメントを除外する
+  const validPostsData = (postsData || []).filter((p) => p.profiles);
+  validPostsData.forEach((p) => {
+    p.comments = p.comments.filter((c: Comment) => c.profiles);
+  });
+  const initialItems = validPostsData.map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
   // --- ここまで ---
 
   return {

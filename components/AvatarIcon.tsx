@@ -6,16 +6,17 @@ type AvatarIconProps = {
   avatarUrlPath: string | null | undefined;
   size: number;
   isActive?: boolean;
+  priority?: boolean;
 };
 
-const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
+const AvatarIcon = ({ avatarUrlPath, size, isActive, priority = false }: AvatarIconProps) => {
   const supabase = useSupabase();
   const imageUrl = useMemo(() => {
     if (avatarUrlPath && supabase) {
       if (avatarUrlPath.startsWith('http')) {
         return avatarUrlPath;
       } else {
-        return supabase.storage.from('avatars').getPublicUrl(avatarUrlPath).data?.publicUrl;
+        return supabase.storage.from('avatars').getPublicUrl(avatarUrlPath).data?.publicUrl ?? null;
       }
     }
     return null;
@@ -28,7 +29,14 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
         style={{ width: size, height: size }}
       >
         {imageUrl ? (
-          <Image src={imageUrl} alt="avatar" className="w-full h-full object-cover" width={size} height={size} />
+          <Image
+            src={imageUrl}
+            alt="avatar"
+            className="w-full h-full object-cover"
+            width={size}
+            height={size}
+            priority={priority}
+          />
         ) : (
           <div className="w-full h-full bg-gray-700" />
         )}

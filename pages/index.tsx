@@ -118,7 +118,8 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser }) =>
             </div>
           ) : null}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {Array.isArray(profiles) && profiles.map((profile) => <ProfileCard key={profile.id} profile={profile} />)}
+            {Array.isArray(profiles) &&
+              profiles.map((profile, index) => <ProfileCard key={profile.id} profile={profile} priority={index < 5} />)}
           </div>
         </div>
       </main>
@@ -259,8 +260,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const excludeFromProfiles = Array.from(new Set([user.id, ...Array.from(blockedUserIds), ...likedByIds]));
 
   let profilesQuery = supabase.from('profiles').select('*').not('username', 'is', null);
-  if (blockedUserIds.size > 0) {
-    profilesQuery = profilesQuery.not('id', 'in', `(${excludeFromProfiles.join(',')})`);
+  if (excludeFromProfiles.length > 0) {
+    // この行は変更ありませんが、この条件が重要です
+    profilesQuery = profilesQuery.not('id', 'in', `(${excludeFromProfiles.join(',')})`); // 修正
   }
   const { data: profilesData, error: profilesError } = await profilesQuery.order('last_seen', {
     ascending: false,

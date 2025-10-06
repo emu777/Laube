@@ -27,7 +27,7 @@ export default function Avatar({
         setImageUrl(url);
       } else {
         const { data } = supabase.storage.from('avatars').getPublicUrl(url);
-        setImageUrl(data.publicUrl);
+        setImageUrl(data.publicUrl ?? null); // publicUrlがnull/undefinedの場合はnullを設定
       }
     }
   }, [url, supabase]);

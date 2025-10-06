@@ -12,9 +12,11 @@ type Profile = {
   hobbies: string[] | null;
   bio: string | null;
 };
+type ProfileCardProps = { profile: Profile; priority?: boolean };
 
-const ProfileCard = React.memo(function ProfileCard({ profile }: { profile: Profile }) {
+function ProfileCardComponent({ profile, priority = false }: ProfileCardProps) {
   const supabase = useSupabase();
+
   // profileオブジェクトと、その中のidが有効な値(空文字列でない)であることを確認します。
   // supabaseクライアントが利用できない場合も何も表示しない
   if (!profile || !profile.id) {
@@ -33,16 +35,16 @@ const ProfileCard = React.memo(function ProfileCard({ profile }: { profile: Prof
         <div className="relative w-full aspect-square">
           {profile.avatar_url ? (
             <Image
-              src={
-                profile.avatar_url.startsWith('http')
-                  ? profile.avatar_url
-                  : supabase
-                    ? supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data?.publicUrl
-                    : ''
-              }
+              src={(() => {
+                if (profile.avatar_url.startsWith('http')) {
+                  return profile.avatar_url;
+                }
+                return supabase ? supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data.publicUrl : '';
+              })()}
               alt="avatar"
               className="w-full h-full object-cover"
               fill
+              priority={priority}
               sizes="150px"
             />
           ) : (
@@ -70,6 +72,9 @@ const ProfileCard = React.memo(function ProfileCard({ profile }: { profile: Prof
       </div>
     </Link>
   );
-});
+}
+
+const ProfileCard = React.memo(ProfileCardComponent);
+ProfileCard.displayName = 'ProfileCard';
 
 export default ProfileCard;

@@ -48,7 +48,10 @@ const getNotificationInfo = (notification: Notification) => {
       return {
         icon: <FaHeart className="text-pink-500" />,
         message: `${senderName}さんがあなたに興味を持っています`,
-        href: `/profile/${notification.sender?.id}`,
+        href: {
+          pathname: '/profile/[id]',
+          query: { id: notification.sender?.id },
+        },
       };
     case 'comment':
       return {
@@ -79,7 +82,11 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
     fallbackData: serverNotifications,
   });
 
-  const handleNotificationClick = (notification: DisplayNotification & { href: string }) => {
+  const handleNotificationClick = (
+    notification: DisplayNotification & {
+      href: string | { pathname: string; query: { id: string | undefined } };
+    }
+  ) => {
     // --- 楽観的UI更新 ---
     // グループ化された「いいね」通知の場合
     if (isGroupedNotification(notification) && notification.type === 'like') {

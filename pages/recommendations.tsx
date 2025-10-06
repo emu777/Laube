@@ -175,7 +175,10 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                             </span>
                           </>
                         ) : (
-                          <Link href={`/profile/${rec.user_id}`} className="flex items-center gap-2">
+                          <Link
+                            href={{ pathname: '/profile/[id]', query: { id: rec.user_id } }}
+                            className="flex items-center gap-2"
+                          >
                             <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
                             <span className="text-xs text-gray-400 hover:text-white transition-colors">
                               {rec.profiles?.username || '匿名さん'}
