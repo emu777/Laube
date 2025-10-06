@@ -2,7 +2,7 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { serialize, parse } from 'cookie';
 import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect } from 'react';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
@@ -99,7 +99,10 @@ const MatchesPage: NextPage<MatchesPageProps> = ({ matches }) => {
                 onMouseUp={(e) => handleDragEnd(e, friend)}
               >
                 <Link
-                  href={`/profile/${friend.id}`}
+                  href={{
+                    pathname: '/profile/[id]',
+                    query: { id: friend.id },
+                  }}
                   className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
                 >
                   <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />

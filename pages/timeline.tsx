@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { FaRegComment } from 'react-icons/fa';
 import AvatarIcon from '@/components/AvatarIcon';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -288,13 +288,19 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                   return (
                     <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
                       <div className="flex items-start space-x-4">
-                        <Link href={`/profile/${item.user_id}`} className="flex-shrink-0 cursor-pointer">
+                        <Link
+                          href={{ pathname: '/profile/[id]', query: { id: item.user_id } }}
+                          className="flex-shrink-0 cursor-pointer"
+                        >
                           <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} />
                         </Link>
                         <div className="flex-1">
                           <div className="text-xs text-gray-400 mb-2">
                             <Link
-                              href={`/profile/${item.parent_post?.user_id}`}
+                              href={{
+                                pathname: '/profile/[id]',
+                                query: { id: item.parent_post?.user_id },
+                              }}
                               className="font-bold text-pink-400 hover:underline"
                             >
                               {(Array.isArray(item.parent_post?.profiles) && item.parent_post.profiles[0]?.username) ||
@@ -319,7 +325,10 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                   <div key={post.id} id={post.id}>
                     <div className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
                       <div className="flex items-start space-x-4">
-                        <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 cursor-pointer">
+                        <Link
+                          href={{ pathname: '/profile/[id]', query: { id: post.user_id } }}
+                          className="flex-shrink-0 cursor-pointer"
+                        >
                           <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} />
                         </Link>
                         <div className="flex-1 flex flex-col">
@@ -409,7 +418,10 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                         <div className="space-y-3 mt-4 border-t border-gray-700 pt-4">
                           {post.comments.map((comment) => (
                             <div key={comment.id} className="flex items-start space-x-3 pl-2">
-                              <Link href={`/profile/${comment.user_id}`} className="flex-shrink-0">
+                              <Link
+                                href={{ pathname: '/profile/[id]', query: { id: comment.user_id } }}
+                                className="flex-shrink-0"
+                              >
                                 <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={32} />
                               </Link>
                               <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">

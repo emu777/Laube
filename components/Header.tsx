@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useSupabase } from '@/pages/_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);

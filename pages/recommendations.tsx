@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import AvatarIcon from '@/components/AvatarIcon';
 
@@ -148,24 +148,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                     key={rec.id}
                     className="bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden shadow-md"
                   >
-                    <div className="aspect-video relative group">
-                      {/* 再生ボタン付きのオーバーレイ */}
-                      <div
-                        className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        onClick={() => setPlayingVideoId(videoId)}
-                        role="button"
-                        tabIndex={0}
-                        aria-label="動画を再生"
-                      >
-                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                      {/* iframeはタッチイベントを無効化 */}
+                    <div className="aspect-video relative">
                       <iframe
                         width="100%"
                         height="100%"
@@ -174,7 +157,6 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
-                        className="pointer-events-none"
                       ></iframe>
                     </div>
                     <div className="p-4">

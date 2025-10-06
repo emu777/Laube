@@ -1,6 +1,6 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { useSupabase } from '@/pages/_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useRef } from 'react';
 import { serialize, parse } from 'cookie';

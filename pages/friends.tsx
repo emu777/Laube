@@ -2,7 +2,7 @@ import { GetServerSidePropsContext, NextPage } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { serialize, parse } from 'cookie';
 import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect, useMemo } from 'react';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';

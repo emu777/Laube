@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { useSupabase } from '@/pages/_app';
+import React from 'react';
+import { useSupabase } from '@/contexts/SupabaseContext';
 
 type Profile = {
   id: string;
@@ -12,11 +13,22 @@ type Profile = {
   bio: string | null;
 };
 
-const ProfileCard = ({ profile }: { profile: Profile }) => {
+const ProfileCard = React.memo(function ProfileCard({ profile }: { profile: Profile }) {
   const supabase = useSupabase();
+  // profileオブジェクトと、その中のidが有効な値(空文字列でない)であることを確認します。
+  // supabaseクライアントが利用できない場合も何も表示しない
+  if (!profile || !profile.id) {
+    return null; // or a loading skeleton
+  }
 
   return (
-    <Link href={`/profile/${profile.id}`} className="block transition-transform duration-200 hover:scale-105">
+    <Link
+      href={{
+        pathname: '/profile/[id]',
+        query: { id: profile.id },
+      }}
+      className="block transition-transform duration-200 hover:scale-105"
+    >
       <div className="rounded-xl overflow-hidden bg-gray-800/50 border border-gray-700/80 shadow-lg w-[160px]">
         <div className="relative w-full aspect-square">
           {profile.avatar_url ? (
@@ -24,7 +36,9 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
               src={
                 profile.avatar_url.startsWith('http')
                   ? profile.avatar_url
-                  : supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data.publicUrl
+                  : supabase
+                    ? supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data?.publicUrl
+                    : ''
               }
               alt="avatar"
               className="w-full h-full object-cover"
@@ -56,5 +70,6 @@ const ProfileCard = ({ profile }: { profile: Profile }) => {
       </div>
     </Link>
   );
-};
+});
+
 export default ProfileCard;

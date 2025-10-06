@@ -4,7 +4,7 @@ import { serialize, parse } from 'cookie';
 import { useRouter } from 'next/router';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSWRConfig } from 'swr';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import PageLayout from '@/components/PageLayout';
 import Link from 'next/link';

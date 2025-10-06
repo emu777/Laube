@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSupabase } from '@/pages/_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import Image from 'next/image';
 
 type Profile = {

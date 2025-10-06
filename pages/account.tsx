@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { GetServerSidePropsContext } from 'next';
 import { serialize, parse } from 'cookie';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import Avatar from '@/components/Avatar';
 import PageLayout from '@/components/PageLayout';
+import SelectInput from '@/components/SelectInput'; // 作成したコンポーネントをインポート
 
 // プロフィールデータの型を定義します
 type Profile = {
@@ -322,31 +323,15 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2 relative">
-                <label htmlFor="location" className="text-sm font-medium text-gray-400">
-                  居住地
-                </label>
-                <select
-                  id="location"
-                  value={location || ''}
-                  onChange={(e) => setLocation(e.target.value)}
-                  autoComplete="address-level1"
-                  className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {locationOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 top-6 flex items-center px-2 text-gray-400">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
+              <SelectInput
+                id="location"
+                label="居住地"
+                value={location || ''}
+                onChange={(e) => setLocation(e.target.value)}
+                options={locationOptions}
+                required
+                autoComplete="address-level1"
+              />
               <div className="space-y-2 relative">
                 <label htmlFor="age" className="text-sm font-medium text-gray-400">
                   年齢

@@ -3,7 +3,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { serialize, parse } from 'cookie';
 import { useRouter } from 'next/router';
 import AvatarIcon from '@/components/AvatarIcon';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import useSWR, { useSWRConfig } from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';

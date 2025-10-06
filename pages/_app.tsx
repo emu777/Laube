@@ -10,6 +10,7 @@ import PageLoader from '@/components/PageLoader';
 import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
+import SupabaseContext from '@/contexts/SupabaseContext';
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 import '@/styles/globals.css';
 
@@ -24,16 +25,6 @@ const mplus1 = M_PLUS_1({
   subsets: ['latin'],
   display: 'swap',
 });
-
-const SupabaseContext = createContext<SupabaseClient | null>(null);
-
-export const useSupabase = () => {
-  const context = useContext(SupabaseContext);
-  if (context === null) {
-    throw new Error('useSupabase must be used within a SupabaseProvider');
-  }
-  return context;
-};
 
 // --- New NavigationGuardContext ---
 type NavigationGuardFunction = (targetPath: string) => Promise<boolean>;

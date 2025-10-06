@@ -1,13 +1,12 @@
-import { GetServerSidePropsContext, NextPage } from 'next';
+import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import PageLoader from '@/components/PageLoader';
-import { useSupabase } from '../_app';
-import type { User, SupabaseClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { serialize, parse } from 'cookie';
+import { useSupabase } from '@/contexts/SupabaseContext';
+import type { User } from '@supabase/supabase-js';
+
 const ProfilePage: NextPage = () => {
   const supabase = useSupabase();
   const [user, setUser] = useState<User | null>(null);
@@ -15,53 +14,73 @@ const ProfilePage: NextPage = () => {
   const { id } = router.query;
   const profileId = Array.isArray(id) ? id[0] : id;
 
-  const fetcher = useCallback(async () => {
-    if (!profileId || !user) return null;
-
-    const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', profileId).single();
-
-    if (error || !profile) {
-      throw new Error('User not found');
-    }
-
-    const isMyProfile = user.id === profile.id;
-    let isLiked = false;
-    let isLikedBy = false;
-
-    if (!isMyProfile) {
-      const { count: likeCount } = await supabase
-        .from('likes')
-        .select('*', { count: 'exact', head: true })
-        .eq('liker_id', user.id)
-        .eq('liked_id', profile.id);
-      isLiked = (likeCount ?? 0) > 0;
-
-      const { count: likedByCount } = await supabase
-        .from('likes')
-        .select('*', { count: 'exact', head: true })
-        .eq('liker_id', profile.id)
-        .eq('liked_id', user.id);
-      isLikedBy = (likedByCount ?? 0) > 0;
-    }
-
-    const isMatched = isLiked && isLikedBy;
-
-    return { profile, isLiked, isLikedBy, isMyProfile, isMatched };
-  }, [supabase, user, profileId]);
-
   // profileId と user.id の両方が利用可能になってからSWRキーを生成し、fetcherを実行する
-  const swrKey = profileId && user ? `profile_${profileId}_${user.id}` : null;
-  const { data, error, isLoading } = useSWR(swrKey, fetcher, {
-    revalidateOnFocus: false,
-  });
+  const swrKey = router.isReady && profileId && user ? `profile_${profileId}_${user.id}` : null;
+  const { data, error, isLoading } = useSWR(
+    swrKey,
+    async () => {
+      // useSWR内で直接非同期処理を定義する
+      // swrKeyがnullの間はこの関数は実行されない
+      if (!profileId || !user || !supabase) {
+        // このチェックは理論上不要だが、念のため残す
+        return null;
+      }
 
-  const { profile, isLikedBy, isMyProfile } = data || {};
+      const { data: profile, error: profileError } = await supabase!
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error('User not found');
+      }
+
+      const isMyProfile = user.id === profile.id;
+      let isLiked = false;
+      let isLikedBy = false;
+
+      if (!isMyProfile) {
+        const { count: likeCount } = await supabase!
+          .from('likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('liker_id', user.id)
+          .eq('liked_id', profile.id);
+        isLiked = (likeCount ?? 0) > 0;
+
+        const { count: likedByCount } = await supabase!
+          .from('likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('liker_id', profile.id)
+          .eq('liked_id', user.id);
+        isLikedBy = (likedByCount ?? 0) > 0;
+      }
+
+      const isMatched = isLiked && isLikedBy;
+
+      return { profile, isLiked, isLikedBy, isMyProfile, isMatched };
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  const { profile, isLikedBy, isMyProfile } = data ?? {};
 
   const [isLiked, setIsLiked] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showUnlikeConfirm, setShowUnlikeConfirm] = useState(false);
+
+  // ユーザー情報を取得する
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setUser(user);
+      });
+    }
+  }, [supabase]);
 
   useEffect(() => {
     if (data) {
@@ -70,16 +89,6 @@ const ProfilePage: NextPage = () => {
     }
   }, [data]);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    fetchUser();
-  }, [supabase]);
-
   const createChatRoom = async () => {
     if (!user || !profile) return;
 
@@ -87,7 +96,7 @@ const ProfilePage: NextPage = () => {
     const user2 = user.id > profile.id ? user.id : profile.id;
 
     // 1. 最初にチャットルームが存在するか確認
-    const { data: existingRoom } = await supabase
+    const { data: existingRoom } = await supabase!
       .from('chat_rooms')
       .select('id')
       .eq('user1_id', user1)
@@ -99,7 +108,7 @@ const ProfilePage: NextPage = () => {
       router.push(`/chat/${existingRoom.id}`);
     } else {
       // 存在しなければ、新しく作成して遷移
-      const { data: newRoom, error: insertError } = await supabase
+      const { data: newRoom, error: insertError } = await supabase!
         .from('chat_rooms')
         .insert({ user1_id: user1, user2_id: user2 })
         .select('id')
@@ -117,21 +126,26 @@ const ProfilePage: NextPage = () => {
       // いいね取り消し確認モーダルを表示
       setShowUnlikeConfirm(true);
     } else {
+      // Optimistic UI: Update the state immediately
+      setIsLiked(true);
+
       // いいねする (マッチング成立かチェック)
-      const { error } = await supabase.from('likes').insert({ liker_id: user.id, liked_id: profile.id });
+      const { error } = await supabase!.from('likes').insert({ liker_id: user.id, liked_id: profile.id });
       if (error) {
+        // 失敗した場合はUIを元に戻す
+        setIsLiked(false);
         console.error('Error liking profile:', error);
+        alert('処理に失敗しました。');
       } else {
-        setIsLiked(true);
         // 「いいね」された相手に通知を送る
         await Promise.all([
-          supabase.from('notifications').insert({
+          supabase!.from('notifications').insert({
             recipient_id: profile.id,
             sender_id: user.id,
             type: 'like',
             reference_id: user.id,
           }),
-          supabase.functions.invoke('send-push-notification', {
+          supabase!.functions.invoke('send-push-notification', {
             body: {
               recipient_id: profile.id,
               title: '新しい「いいね！」が届きました',
@@ -154,7 +168,7 @@ const ProfilePage: NextPage = () => {
   const handleMatch = async () => {
     if (!user || !profile || isMyProfile) return;
     // 念のため、自分のいいねも作成する
-    await supabase.from('likes').upsert({ liker_id: user.id, liked_id: profile.id });
+    await supabase!.from('likes').upsert({ liker_id: user.id, liked_id: profile.id });
     setIsLiked(true);
     setIsMatched(true);
     await createChatRoom();
@@ -162,7 +176,7 @@ const ProfilePage: NextPage = () => {
 
   const handleUnlike = async () => {
     if (!user || !profile) return;
-    const { error } = await supabase.from('likes').delete().match({ liker_id: user.id, liked_id: profile.id });
+    const { error } = await supabase!.from('likes').delete().match({ liker_id: user.id, liked_id: profile.id });
     if (error) {
       console.error('Error unliking profile:', error);
       alert('処理に失敗しました。');
@@ -176,7 +190,7 @@ const ProfilePage: NextPage = () => {
     if (!user || !profile || isMyProfile) return;
 
     // 1. 相手からのいいねを削除
-    const { error: deleteLikeError } = await supabase
+    const { error: deleteLikeError } = await supabase!
       .from('likes')
       .delete()
       .match({ liker_id: profile.id, liked_id: user.id });
@@ -189,7 +203,7 @@ const ProfilePage: NextPage = () => {
     // 3. 既存のチャットルームがあれば削除
     const user1 = user.id < profile.id ? user.id : profile.id;
     const user2 = user.id > profile.id ? user.id : profile.id;
-    const { error: deleteRoomError } = await supabase
+    const { error: deleteRoomError } = await supabase!
       .from('chat_rooms')
       .delete()
       .eq('user1_id', user1)
@@ -199,7 +213,7 @@ const ProfilePage: NextPage = () => {
     }
 
     // 2. 相互ブロックのデータを作成
-    const { error: blockError } = await supabase.rpc('create_mutual_block', {
+    const { error: blockError } = await supabase!.rpc('create_mutual_block', {
       p_blocker_id: user.id,
       p_blocked_id: profile.id,
     });
@@ -213,7 +227,7 @@ const ProfilePage: NextPage = () => {
   };
 
   // データ取得中、または表示に必要な情報が未確定の間はローディング画面を表示
-  if (isLoading || !profileId || !user || !data) {
+  if (!router.isReady || !supabase || !user || isLoading) {
     return <PageLoader />;
   }
 
@@ -295,7 +309,11 @@ const ProfilePage: NextPage = () => {
               )}
               {profile.avatar_url ? (
                 <Image
-                  src={profile.avatar_url}
+                  src={
+                    profile.avatar_url.startsWith('http')
+                      ? profile.avatar_url
+                      : supabase!.storage.from('avatars').getPublicUrl(profile.avatar_url).data.publicUrl
+                  }
                   alt="avatar"
                   className="w-full h-full object-cover"
                   fill

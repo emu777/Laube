@@ -4,7 +4,7 @@ import { serialize, parse } from 'cookie';
 import { NextPage, GetServerSidePropsContext } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useRouter } from 'next/router';
-import { useSupabase } from './_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import { useState, useEffect } from 'react';
 
 const Login: NextPage = () => {

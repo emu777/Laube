@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { useSupabase } from '@/pages/_app';
+import { useSupabase } from '@/contexts/SupabaseContext';
 
 type AvatarIconProps = {
   avatarUrlPath: string | null | undefined;
@@ -10,17 +10,15 @@ type AvatarIconProps = {
 
 const AvatarIcon = ({ avatarUrlPath, size, isActive }: AvatarIconProps) => {
   const supabase = useSupabase();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (avatarUrlPath) {
+  const imageUrl = useMemo(() => {
+    if (avatarUrlPath && supabase) {
       if (avatarUrlPath.startsWith('http')) {
-        setImageUrl(avatarUrlPath);
+        return avatarUrlPath;
       } else {
-        const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrlPath);
-        setImageUrl(data.publicUrl);
+        return supabase.storage.from('avatars').getPublicUrl(avatarUrlPath).data?.publicUrl;
       }
     }
+    return null;
   }, [avatarUrlPath, supabase]);
 
   return (
