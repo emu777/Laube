@@ -1,9 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import formidable from 'formidable';
+import fetch from 'node-fetch';
+import { Readable } from 'stream';
+import FormData from 'form-data'; // form-dataをインポート
 import { createServerClient } from '@supabase/ssr';
-import { Formidable } from 'formidable';
 import fs from 'fs';
-import SftpClient from 'ssh2-sftp-client';
-import path from 'path';
 
 // formidableにファイルのアップロードを処理させるため、Next.jsのデフォルトのbodyパーサーを無効化
 export const config = {
@@ -14,7 +15,7 @@ export const config = {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // ユーザー認証
@@ -35,63 +36,100 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const sftp = new SftpClient();
   try {
-    // form.parse()をtryブロックの中に移動
-    const form = new Formidable();
+    const form = formidable({});
     const [fields, files] = await form.parse(req);
+
+    // データベースから現在の（古い）アバターURLを取得
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single();
+
+    // フロントエンドから渡される代わりに、ここで取得する
+    const oldAvatarUrl = profileData?.avatar_url;
+
     const file = files.file?.[0];
     if (!file) {
-      return res.status(400).json({ error: 'ファイルがアップロードされていません。' });
+      return res.status(400).json({ error: 'ファイルが見つかりません。' });
     }
 
-    // 一意のファイル名を生成
-    const fileExt = path.extname(file.originalFilename || 'file');
-    const fileName = `${user.id}-${Date.now()}${fileExt}`;
-    const remotePath = path.join(process.env.XSERVER_UPLOAD_PATH!, fileName);
+    // PHPスクリプトに送信するためのフォームデータを作成
+    const formData = new FormData();
+    const fileStream = fs.createReadStream(file.filepath);
+    formData.append('file', fileStream, file.originalFilename || 'upload.jpg');
 
-    // SFTPクライアントの設定
-    try {
-      // デバッグ用ログ：どのホストとユーザーで接続しようとしているか確認
-      console.log(`Attempting to connect to SFTP: host=${process.env.XSERVER_HOST}, user=${process.env.XSERVER_USER}`);
+    // PHPスクリプトのエンドポイントURL
+    const uploadUrl = 'https://laube777.com/avatars/img_upload.php'; // Xserverに設置したimg_upload.phpの正しいURL
 
-      await sftp.connect({
-        host: process.env.XSERVER_HOST,
-        port: parseInt(process.env.XSERVER_PORT || '22', 10),
-        username: process.env.XSERVER_USER,
-        password: process.env.XSERVER_PASSWORD,
-        readyTimeout: 20000, // 接続タイムアウトを20秒に設定,
-        debug: (msg: string) => console.log(`SFTP Debug: ${msg}`), // デバッグログを有効化
-        // Xserverで一般的にサポートされているアルゴリズムを明示的に指定
-        algorithms: {
-          serverHostKey: ['ssh-rsa', 'ecdsa-sha2-nistp256', 'ssh-dss'],
-          kex: ['diffie-hellman-group14-sha1', 'diffie-hellman-group-exchange-sha256'],
-        },
-      });
-    } catch (connectError) {
-      console.error('SFTP Connection Error:', connectError);
-      throw new Error('SFTPサーバーへの接続に失敗しました。ホスト名、ユーザー名、パスワードを確認してください。');
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // form-dataが自動でContent-Typeヘッダーを設定するため、ここではカスタムヘッダーのみ
+        // PHP側で設定した秘密のキーをヘッダーに含める
+        'X-Upload-Token': 'sykosaryo03090730', // PHPスクリプトと同じキーを設定
+      },
+    });
+
+    if (!response.ok) {
+      // PHPスクリプトからの応答がJSONでない場合（HTMLエラーページなど）を考慮
+      const errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText);
+        if (typeof errorData === 'object' && errorData !== null && 'error' in errorData) {
+          throw new Error(String((errorData as { error: unknown }).error));
+        }
+      } catch (e) {
+        // JSONの解析に失敗した場合、HTMLの内容をエラーとして表示
+        throw new Error(`アップロードサーバーからの予期しない応答です: ${errorText.substring(0, 200)}`);
+      }
+      throw new Error(`アップロードに失敗しました。ステータス: ${response.status}`);
     }
 
-    // ファイルをXserverにアップロード
-    try {
-      const data = fs.createReadStream(file.filepath);
-      await sftp.put(data, remotePath);
-    } catch (uploadError) {
-      console.error('SFTP Upload Error:', uploadError);
-      throw new Error('SFTPサーバーへのファイルアップロードに失敗しました。アップロードパスを確認してください。');
+    const result: unknown = await response.json(); // 成功時はJSONを期待
+    // 型ガード: resultがオブジェクトで、'url'プロパティを持つか確認
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      'url' in result &&
+      typeof (result as { url: unknown }).url === 'string'
+    ) {
+      const newUrl = (result as { url: string }).url;
+
+      // 古いアバターの削除処理 (oldAvatarUrlが存在し、XserverのURLである場合のみ)
+      if (
+        oldAvatarUrl &&
+        typeof oldAvatarUrl === 'string' &&
+        oldAvatarUrl.startsWith('https://laube777.com/avatars/images/')
+      ) {
+        try {
+          const oldUrlToDelete = oldAvatarUrl.split('?')[0]; // キャッシュバスティング用のクエリを除去
+          const deleteResponse = await fetch('https://laube777.com/avatars/delete_avatar.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Delete-Token': 'sykosaryo03090730', // PHPスクリプトで設定した秘密のキー
+            },
+            body: JSON.stringify({ fileUrl: oldUrlToDelete }),
+          });
+          if (!deleteResponse.ok) {
+            console.error('古いアバターの削除に失敗しました (PHP):', await deleteResponse.text());
+          } else {
+            console.log('古いアバターを削除しました:', oldUrlToDelete);
+          }
+        } catch (deleteError) {
+          console.error('古いアバターの削除リクエストに失敗しました:', deleteError);
+        }
+      }
+
+      res.status(200).json({ url: newUrl }); // 新しいURLをクライアントに返す
+    } else {
+      throw new Error('PHPスクリプトからの応答が不正です。');
     }
-
-    await sftp.end();
-
-    // アップロードされたファイルの公開URLを生成
-    const publicUrl = `${process.env.XSERVER_PUBLIC_URL_BASE}/${fileName}`;
-
-    // クライアントに公開URLを返す
-    res.status(200).json({ url: publicUrl });
   } catch (error: unknown) {
     console.error('An unexpected error occurred in /api/upload-avatar:', error);
-    await sftp.end(); // 接続があれば閉じ、なければ何もしない
     let errorMessage = 'ファイルのアップロードに失敗しました。';
     if (error instanceof Error) {
       errorMessage = error.message;

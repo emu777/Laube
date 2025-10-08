@@ -63,7 +63,7 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser }) =>
                 <div className="flex items-center gap-2 overflow-hidden">
                   <h2 className="text-lg font-semibold text-pink-400 mr-2 whitespace-nowrap">あなたに片思い中</h2>
                   {likedByUsers.slice(0, 5).map(({ liker }) => {
-                    if (!liker) return null;
+                    if (!liker?.id) return null;
                     return (
                       <Link
                         key={liker.id}
@@ -98,7 +98,7 @@ const Home: NextPage<HomePageProps> = ({ profiles, likedByUsers, isNewUser }) =>
               {showAllLikedBy && (
                 <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {likedByUsers.map(({ liker }) => {
-                    if (!liker) return null;
+                    if (!liker?.id) return null;
                     return (
                       <Link
                         key={liker.id}
@@ -261,8 +261,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   let profilesQuery = supabase.from('profiles').select('*').not('username', 'is', null);
   if (excludeFromProfiles.length > 0) {
-    // この行は変更ありませんが、この条件が重要です
-    profilesQuery = profilesQuery.not('id', 'in', `(${excludeFromProfiles.join(',')})`); // 修正
+    profilesQuery = profilesQuery.not('id', 'in', `(${excludeFromProfiles.join(',')})`);
   }
   const { data: profilesData, error: profilesError } = await profilesQuery.order('last_seen', {
     ascending: false,

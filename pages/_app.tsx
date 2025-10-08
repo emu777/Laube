@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { Noto_Sans_JP, M_PLUS_1 } from 'next/font/google';
 import { useSWRConfig } from 'swr';
 import dynamic from 'next/dynamic';
+import { Toaster } from 'react-hot-toast'; // react-hot-toastをインポート
 import PageLoader from '@/components/PageLoader';
 import { NotificationProvider, useNotifications } from '@/contexts/NotificationContext';
 import Header from '@/components/Header';
@@ -131,6 +132,7 @@ export default function MyApp({
           <NavigationGuardContext.Provider value={navigationGuardContextValue}>
             {' '}
             {/* Add Provider here */}
+            <Toaster /> {/* Toasterコンポーネントを追加 */}
             <AppContent Component={Component} pageProps={pageProps} router={router} />
           </NavigationGuardContext.Provider>{' '}
           {/* Close Provider here */}

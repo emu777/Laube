@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  unoptimized: true,
   images: {
     remotePatterns: [
       {
@@ -11,11 +12,12 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'ufncdfxyawpmotgywzeo.supabase.co',
       },
-      // If you are still using Xserver for new avatars, add its hostname here.
-      // {
-      //   protocol: 'https',
-      //   hostname: 'your-xserver-domain.com',
-      // },
+      // Xserverの画像用
+      {
+        protocol: 'https',
+        hostname: 'laube777.com',
+        pathname: '/avatars/images/**',
+      },
     ],
   },
 };

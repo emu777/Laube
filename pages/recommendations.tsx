@@ -174,7 +174,7 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                               のオススメ
                             </span>
                           </>
-                        ) : (
+                        ) : rec.user_id ? (
                           <Link
                             href={{ pathname: '/profile/[id]', query: { id: rec.user_id } }}
                             className="flex items-center gap-2"
@@ -182,9 +182,13 @@ const RecommendationsPage: NextPage<RecommendationsPageProps> = ({ initialRecomm
                             <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
                             <span className="text-xs text-gray-400 hover:text-white transition-colors">
                               {rec.profiles?.username || '匿名さん'}
-                              のオススメ
                             </span>
                           </Link>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <AvatarIcon avatarUrlPath={rec.profiles?.avatar_url} size={24} />
+                            <span className="text-xs text-gray-400">{rec.profiles?.username || '匿名さん'}</span>
+                          </div>
                         )}
                       </div>
                       <p className="text-xs text-gray-300 whitespace-pre-wrap mt-2 leading-relaxed">{rec.comment}</p>

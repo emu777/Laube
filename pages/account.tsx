@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { GetServerSidePropsContext } from 'next';
 import { serialize, parse } from 'cookie';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
+import toast from 'react-hot-toast'; // react-hot-toastをインポート
 import Avatar from '@/components/Avatar';
 import PageLayout from '@/components/PageLayout';
 import SelectInput from '@/components/SelectInput'; // 作成したコンポーネントをインポート
@@ -52,6 +53,10 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
   const [datingExperience, setDatingExperience] = useState<Profile['dating_experience']>('');
   const [mbti, setMbti] = useState<Profile['mbti']>('');
 
+  // 常に最新のavatar_urlを保持するためのref
+  const avatarUrlRef = useRef(avatar_url);
+  avatarUrlRef.current = avatar_url;
+
   useEffect(() => {
     if (profile) {
       setUsername(profile.username || '');
@@ -74,6 +79,7 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
 
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
 
   const isFormInvalid = useMemo(() => {
     return (
@@ -126,7 +132,7 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
     }
     const updates: Partial<Profile> = {
       username: username,
-      avatar_url, // avatar_urlを更新オブジェクトに含める
+      avatar_url: avatar_url, // avatar_urlを更新オブジェクトに含める
       location,
       sexualities,
       position,
@@ -146,6 +152,58 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
     }
     updateProfile(updates);
   }; // handleUpdateProfileの終了
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!profile) return;
+    setIsAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'アップロードに失敗しました。';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // JSONの解析に失敗した場合、テキストをそのままエラーメッセージとして使用
+        } // ここにセミコロンがありませんでした
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      const newUrl = data.url;
+
+      // キャッシュバスティング: URLにタイムスタンプを追加してブラウザキャッシュを無効化
+      const newCacheBustedUrl = `${newUrl}?t=${new Date().getTime()}`;
+
+      // 2. データベースのURLを更新
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: newCacheBustedUrl })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // 3. UIの状態を更新
+      setAvatarUrl(newCacheBustedUrl);
+
+      toast.success('アバター画像を更新しました。');
+    } catch (error) {
+      console.error('An error occurred during avatar upload:', error);
+      toast.error('アバターの更新に失敗しました。');
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
   const handleSexualityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = e.target;
     setSexualities((prev) => {
@@ -298,9 +356,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
             uid={profile.id}
             url={avatar_url}
             size={150}
-            onUpload={(url: string) => {
-              setAvatarUrl(url); // UIを即時反映
-            }}
+            onFileSelect={handleAvatarUpload}
+            isUploading={isAvatarUploading}
           />
         </div>
 

@@ -7,30 +7,19 @@ type AvatarIconProps = {
   size: number;
   isActive?: boolean;
   priority?: boolean;
+  shape?: 'round' | 'square';
 };
 
-const AvatarIcon = ({ avatarUrlPath, size, isActive, priority = false }: AvatarIconProps) => {
-  const supabase = useSupabase();
-  const imageUrl = useMemo(() => {
-    if (avatarUrlPath && supabase) {
-      if (avatarUrlPath.startsWith('http')) {
-        return avatarUrlPath;
-      } else {
-        return supabase.storage.from('avatars').getPublicUrl(avatarUrlPath).data?.publicUrl ?? null;
-      }
-    }
-    return null;
-  }, [avatarUrlPath, supabase]);
-
+const AvatarIcon = ({ avatarUrlPath, size, isActive, priority = false, shape = 'round' }: AvatarIconProps) => {
   return (
     <div className="relative">
       <div
-        className="rounded-full bg-gray-700 overflow-hidden border border-gray-800"
+        className={`bg-gray-700 overflow-hidden border border-gray-800 ${shape === 'round' ? 'rounded-full' : 'rounded-none'}`}
         style={{ width: size, height: size }}
       >
-        {imageUrl ? (
+        {avatarUrlPath && avatarUrlPath.startsWith('http') ? (
           <Image
-            src={imageUrl}
+            src={avatarUrlPath}
             alt="avatar"
             className="w-full h-full object-cover"
             width={size}
@@ -38,7 +27,11 @@ const AvatarIcon = ({ avatarUrlPath, size, isActive, priority = false }: AvatarI
             priority={priority}
           />
         ) : (
-          <div className="w-full h-full bg-gray-700" />
+          <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+            <span className="text-gray-500 font-bold" style={{ fontSize: Math.max(10, size / 6) }}>
+              Noimage
+            </span>
+          </div>
         )}
       </div>
       {isActive && (

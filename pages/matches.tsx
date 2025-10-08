@@ -99,10 +99,7 @@ const MatchesPage: NextPage<MatchesPageProps> = ({ matches }) => {
                 onMouseUp={(e) => handleDragEnd(e, friend)}
               >
                 <Link
-                  href={{
-                    pathname: '/profile/[id]',
-                    query: { id: friend.id },
-                  }}
+                  href={friend.id ? { pathname: '/profile/[id]', query: { id: friend.id } } : '#'}
                   className="flex items-center gap-4 p-4 w-full hover:bg-gray-800 transition-colors"
                 >
                   <AvatarIcon avatarUrlPath={friend.avatar_url} size={48} />

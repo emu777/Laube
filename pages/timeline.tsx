@@ -288,24 +288,30 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                   return (
                     <div key={`comment-${item.id}`} className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
                       <div className="flex items-start space-x-4">
-                        <Link
-                          href={{ pathname: '/profile/[id]', query: { id: item.user_id } }}
-                          className="flex-shrink-0 cursor-pointer"
-                        >
-                          <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} priority={index < 3} />
-                        </Link>
+                        {item.user_id && (
+                          <Link
+                            href={{ pathname: '/profile/[id]', query: { id: item.user_id } }}
+                            className="flex-shrink-0 cursor-pointer"
+                          >
+                            <AvatarIcon avatarUrlPath={item.profiles?.avatar_url} size={40} priority={index < 3} />
+                          </Link>
+                        )}
                         <div className="flex-1">
                           <div className="text-xs text-gray-400 mb-2">
-                            <Link
-                              href={{
-                                pathname: '/profile/[id]',
-                                query: { id: item.parent_post?.user_id },
-                              }}
-                              className="font-bold text-pink-400 hover:underline"
-                            >
-                              {(Array.isArray(item.parent_post?.profiles) && item.parent_post.profiles[0]?.username) ||
-                                '匿名さん'}
-                            </Link>
+                            {item.parent_post?.user_id ? (
+                              <Link
+                                href={{
+                                  pathname: '/profile/[id]',
+                                  query: { id: item.parent_post.user_id },
+                                }}
+                                className="font-bold text-pink-400 hover:underline"
+                              >
+                                {(Array.isArray(item.parent_post.profiles) && item.parent_post.profiles[0]?.username) ||
+                                  '匿名さん'}
+                              </Link>
+                            ) : (
+                              <span className="font-bold text-pink-400">匿名さん</span>
+                            )}
                             <span>さんへのコメント</span>
                           </div>
                           <div className="flex items-baseline space-x-2">
@@ -325,12 +331,14 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                   <div key={post.id} id={post.id}>
                     <div className="bg-gray-800/50 border border-gray-800 p-4 rounded-xl">
                       <div className="flex items-start space-x-4">
-                        <Link
-                          href={{ pathname: '/profile/[id]', query: { id: post.user_id } }}
-                          className="flex-shrink-0 cursor-pointer"
-                        >
-                          <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} priority={index < 3} />
-                        </Link>
+                        {post.user_id && (
+                          <Link
+                            href={{ pathname: '/profile/[id]', query: { id: post.user_id } }}
+                            className="flex-shrink-0 cursor-pointer"
+                          >
+                            <AvatarIcon avatarUrlPath={post.profiles?.avatar_url} size={40} priority={index < 3} />
+                          </Link>
+                        )}
                         <div className="flex-1 flex flex-col">
                           <div className="flex-1">
                             <div className="flex justify-between items-baseline">
@@ -418,12 +426,14 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialItems }) => {
                         <div className="space-y-3 mt-4 border-t border-gray-700 pt-4">
                           {post.comments.map((comment) => (
                             <div key={comment.id} className="flex items-start space-x-3 pl-2">
-                              <Link
-                                href={{ pathname: '/profile/[id]', query: { id: comment.user_id } }}
-                                className="flex-shrink-0"
-                              >
-                                <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={32} />
-                              </Link>
+                              {comment.user_id && (
+                                <Link
+                                  href={{ pathname: '/profile/[id]', query: { id: comment.user_id } }}
+                                  className="flex-shrink-0"
+                                >
+                                  <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={32} />
+                                </Link>
+                              )}
                               <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">
                                 <p className="text-sm font-bold">{comment.profiles?.username || '匿名さん'}</p>
                                 <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap break-words">
@@ -583,6 +593,10 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   const validPostsData = (postsData || []).filter((p) => p.profiles);
   validPostsData.forEach((p) => {
     p.comments = p.comments.filter((c: Comment) => c.profiles);
+  });
+  // parent_postが取得できなかったコメントも除外する
+  validPostsData.forEach((p) => {
+    p.comments = p.comments.filter((c: Comment) => c.parent_post);
   });
   const initialItems = validPostsData.map((p: Post) => ({ ...p, item_type: 'post' })) as TimelineItem[];
   // --- ここまで ---

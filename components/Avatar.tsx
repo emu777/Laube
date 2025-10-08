@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useSupabase } from '@/contexts/SupabaseContext';
-import Image from 'next/image';
+import React from 'react';
+import AvatarIcon from './AvatarIcon';
 
 type Profile = {
   avatar_url: string | null;
@@ -10,79 +9,25 @@ export default function Avatar({
   uid,
   url,
   size,
-  onUpload,
+  onFileSelect,
+  isUploading,
 }: {
   uid: string;
   url: Profile['avatar_url'];
   size: number;
-  onUpload: (filePath: string) => void;
+  onFileSelect: (file: File) => void; // isUploadingをpropsとして受け取る
+  isUploading: boolean;
 }) {
-  const supabase = useSupabase();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  useEffect(() => {
-    if (url) {
-      if (url.startsWith('http')) {
-        setImageUrl(url);
-      } else {
-        const { data } = supabase.storage.from('avatars').getPublicUrl(url);
-        setImageUrl(data.publicUrl ?? null); // publicUrlがnull/undefinedの場合はnullを設定
-      }
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    if (event.target.files && event.target.files.length > 0) {
+      onFileSelect(event.target.files[0]);
     }
-  }, [url, supabase]);
-
-  const uploadAvatar: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
-    console.log('uploadAvatar function triggered.');
-    try {
-      setUploading(true);
-
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('アップロードする画像を選択してください。');
-      }
-
-      const file = event.target.files[0];
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // 新しく作成したAPIエンドポイントにファイルを送信
-      const response = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'アップロードに失敗しました。');
-      }
-
-      const data = await response.json();
-      const newUrl = data.url;
-
-      console.log('Upload successful. Calling onUpload callback.');
-      onUpload(newUrl); // Xserver上の公開URLを渡す
-    } catch (error) {
-      console.error('An error occurred in uploadAvatar:', error);
-      alert('画像のアップロード中にエラーが発生しました。コンソールで詳細を確認してください。');
-    } finally {
-      console.log('uploadAvatar function finished. Setting uploading to false.');
-      setUploading(false);
-    }
+    event.target.value = ''; // 同じファイルを選択できるように値をリセット
   };
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt="Avatar"
-          className="w-full h-full rounded-full object-cover"
-          width={size}
-          height={size}
-        />
-      ) : (
-        <div className="w-full h-full rounded-full bg-gray-700" />
-      )}
+      <AvatarIcon avatarUrlPath={url} size={size} />
       <div className="absolute bottom-0 right-0">
         <label
           htmlFor="single"
@@ -104,7 +49,7 @@ export default function Avatar({
             />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          {uploading ? 'Uploading ...' : 'Upload'}
+          {isUploading ? '...' : ''}
         </label>
         <input
           style={{
@@ -114,8 +59,8 @@ export default function Avatar({
           type="file"
           id="single"
           accept="image/*"
-          onChange={uploadAvatar}
-          disabled={uploading}
+          onChange={handleFileChange}
+          disabled={isUploading}
         />
       </div>
     </div>
