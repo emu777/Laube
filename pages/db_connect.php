@@ -24,3 +24,13 @@ $options = [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES   => false,
 ];
+
+// データベース接続の確立
+try {
+    $pdo_xserver = new PDO($xserver_dsn, $xserver_user, $xserver_password, $options);
+    $pdo_supabase = new PDO($supabase_dsn, null, null, $options);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
+    exit;
+}

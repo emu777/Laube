@@ -140,7 +140,6 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts, error: initia
       setNewPostContent('');
       setIsFormOpen(false);
       toast.success('投稿しました！');
-      // mutate(); // データを再検証してUIを更新
       // ★★★ 修正点: ローカルのキャッシュを即座に更新する ★★★
       mutate((currentPosts = []) => [newPost, ...currentPosts], {
         revalidate: false, // この更新後、再検証は行わない

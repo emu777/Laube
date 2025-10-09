@@ -1,7 +1,8 @@
 <?php
 require 'cors.php'; // CORS設定を読み込む
 require 'db_connect.php'; // データベース接続を読み込む
-header('Content-Type: application/json; charset=utf-8');
+
+header('Content-Type: application/json; charset=utf-8'); // require の後に移動
 
 // フロントエンドから送信されたJSONデータを取得
 $data = json_decode(file_get_contents('php://input'), true);
@@ -37,11 +38,13 @@ try {
 
     // 3. Supabaseから投稿者のプロフィール情報を取得
     $profile = null;
-    $profiles_stmt = $pdo_supabase->prepare(
-        "SELECT id, username, avatar_url, location, age FROM public.profiles WHERE id = ?"
-    );
-    $profiles_stmt->execute([$userId]);
-    $profile = $profiles_stmt->fetch(PDO::FETCH_ASSOC);
+    if (isset($pdo_supabase)) {
+        $profiles_stmt = $pdo_supabase->prepare(
+            "SELECT id, username, avatar_url, location, age FROM public.profiles WHERE id = ?"
+        );
+        $profiles_stmt->execute([$userId]);
+        $profile = $profiles_stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 
     // 4. フロントエンドが期待するPost型に整形
     $newPost['comments'] = [];
