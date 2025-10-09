@@ -40,15 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const form = formidable({});
     const [fields, files] = await form.parse(req);
 
-    // データベースから現在の（古い）アバターURLを取得
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', user.id)
-      .single();
-
-    // フロントエンドから渡される代わりに、ここで取得する
-    const oldAvatarUrl = profileData?.avatar_url;
+    const oldAvatarUrl = fields.oldAvatarUrl?.[0];
 
     const file = files.file?.[0];
     if (!file) {
@@ -105,24 +97,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         (oldAvatarUrl.startsWith('https://api.laube777.com/avatars/images/') ||
           oldAvatarUrl.startsWith('https://laube777.com/avatars/images/'))
       ) {
-        try {
-          const oldUrlToDelete = oldAvatarUrl.split('?')[0]; // キャッシュバスティング用のクエリを除去
-          const deleteResponse = await fetch('https://api.laube777.com/avatars/delete_avatar.php', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Delete-Token': 'sykosaryo03090730', // PHPスクリプトで設定した秘密のキー
-            },
-            body: JSON.stringify({ fileUrl: oldUrlToDelete }),
-          });
-          if (!deleteResponse.ok) {
-            console.error('古いアバターの削除に失敗しました (PHP):', await deleteResponse.text());
-          } else {
-            console.log('古いアバターを削除しました:', oldUrlToDelete);
-          }
-        } catch (deleteError) {
-          console.error('古いアバターの削除リクエストに失敗しました:', deleteError);
-        }
+        // 古い画像の削除は「撃ちっぱなし」で実行し、成否はメインの処理に影響させない
+        const oldUrlToDelete = oldAvatarUrl.split('?')[0];
+        fetch('https://api.laube777.com/avatars/delete_avatar.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Delete-Token': 'sykosaryo03090730', // PHPスクリプトで設定した秘密のキー
+          },
+          body: JSON.stringify({ fileUrl: oldUrlToDelete }),
+        })
+          .then((res) => {
+            if (res.ok) {
+              console.log('古いアバターの削除リクエストを送信しました:', oldUrlToDelete);
+            } else {
+              res
+                .text()
+                .then((text) => console.warn(`古いアバターの削除に失敗しました (Status: ${res.status}):`, text));
+            }
+          })
+          .catch((err) => console.error('古いアバターの削除リクエスト自体に失敗しました:', err));
       }
 
       res.status(200).json({ url: newUrl }); // 新しいURLをクライアントに返す

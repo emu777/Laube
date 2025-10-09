@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { GetServerSidePropsContext } from 'next';
 import { serialize, parse } from 'cookie';
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
@@ -8,6 +9,7 @@ import toast from 'react-hot-toast'; // react-hot-toastをインポート
 import Avatar from '@/components/Avatar';
 import PageLayout from '@/components/PageLayout';
 import SelectInput from '@/components/SelectInput'; // 作成したコンポーネントをインポート
+import 'react-image-crop/dist/ReactCrop.css';
 
 // プロフィールデータの型を定義します
 type Profile = {
@@ -36,66 +38,40 @@ type AccountPageProps = {
 
 export default function Account({ profile: initialProfile }: AccountPageProps) {
   const supabase = useSupabase();
-  const [profile, setProfile] = useState(initialProfile);
-  const [username, setUsername] = useState<Profile['username']>('');
-  const [avatar_url, setAvatarUrl] = useState<Profile['avatar_url']>(null);
-  const [location, setLocation] = useState<Profile['location']>('');
-  const [age, setAge] = useState<Profile['age']>(null);
-  const [sexualities, setSexualities] = useState<Profile['sexualities']>([]);
-  const [position, setPosition] = useState<Profile['position']>('');
-  const [vibe, setVibe] = useState<Profile['vibe']>('');
-  const [drinking, setDrinking] = useState<Profile['drinking']>('');
-  const [smoking, setSmoking] = useState<Profile['smoking']>('');
-  const [bio, setBio] = useState<Profile['bio']>('');
-  const [hobbies, setHobbies] = useState<Profile['hobbies']>([]);
-  const [partnerStatus, setPartnerStatus] = useState<Profile['partner_status']>('');
-  const [maritalStatus, setMaritalStatus] = useState<Profile['marital_status']>('');
-  const [datingExperience, setDatingExperience] = useState<Profile['dating_experience']>('');
-  const [mbti, setMbti] = useState<Profile['mbti']>('');
+  const [profile, setProfile] = useState<Profile>(initialProfile);
 
   // 常に最新のavatar_urlを保持するためのref
-  const avatarUrlRef = useRef(avatar_url);
-  avatarUrlRef.current = avatar_url;
-
-  useEffect(() => {
-    if (profile) {
-      setUsername(profile.username || '');
-      setAvatarUrl(profile.avatar_url || null);
-      setLocation(profile.location || '');
-      setAge(profile.age || null);
-      setSexualities(profile.sexualities || []);
-      setPosition(profile.position || '');
-      setVibe(profile.vibe || '');
-      setDrinking(profile.drinking || '');
-      setSmoking(profile.smoking || '');
-      setBio(profile.bio || '');
-      setHobbies(profile.hobbies || []);
-      setPartnerStatus(profile.partner_status || '');
-      setMaritalStatus(profile.marital_status || '');
-      setDatingExperience(profile.dating_experience || '');
-      setMbti(profile.mbti || '');
-    }
-  }, [profile]);
+  const avatarUrlRef = useRef(profile.avatar_url);
+  avatarUrlRef.current = profile.avatar_url;
 
   const [isOptionalSectionOpen, setIsOptionalSectionOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
 
+  // --- クロップ機能用のState ---
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // --- ここまで ---
+
   const isFormInvalid = useMemo(() => {
     return (
-      !username?.trim() ||
-      !location ||
-      !age ||
-      !sexualities ||
-      sexualities.length === 0 ||
-      !vibe ||
-      !position ||
-      !partnerStatus ||
-      !maritalStatus ||
-      !hobbies ||
-      hobbies.length === 0
+      !profile.username?.trim() ||
+      !profile.location ||
+      !profile.age ||
+      !profile.sexualities ||
+      profile.sexualities.length === 0 ||
+      !profile.vibe ||
+      !profile.position ||
+      !profile.partner_status ||
+      !profile.marital_status ||
+      !profile.hobbies ||
+      profile.hobbies.length === 0
     );
-  }, [username, location, age, sexualities, vibe, position, partnerStatus, maritalStatus, hobbies]);
+  }, [profile]);
 
   async function updateProfile(updates: Partial<Profile>, alertMessage: string = 'プロフを更新しました。') {
     try {
@@ -131,27 +107,95 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
       return;
     }
     const updates: Partial<Profile> = {
-      username: username,
-      avatar_url: avatar_url, // avatar_urlを更新オブジェクトに含める
-      location,
-      sexualities,
-      position,
-      vibe,
-      drinking,
-      smoking,
-      bio,
-      hobbies,
-      partner_status: partnerStatus, // Supabaseのカラム名に合わせる
-      marital_status: maritalStatus, // Supabaseのカラム名に合わせる
-      dating_experience: datingExperience, // Supabaseのカラム名に合わせる
-      mbti, // Supabaseのカラム名に合わせる
+      username: profile.username,
+      avatar_url: profile.avatar_url,
+      location: profile.location,
+      sexualities: profile.sexualities,
+      position: profile.position,
+      vibe: profile.vibe,
+      drinking: profile.drinking,
+      smoking: profile.smoking,
+      bio: profile.bio,
+      hobbies: profile.hobbies,
+      partner_status: profile.partner_status,
+      marital_status: profile.marital_status,
+      dating_experience: profile.dating_experience,
+      mbti: profile.mbti,
     };
     // ageがnullでない場合のみupdatesオブジェクトに追加
-    if (age !== null) {
-      updates.age = age;
+    if (profile.age !== null) {
+      updates.age = profile.age;
     }
     updateProfile(updates);
   }; // handleUpdateProfileの終了
+
+  // --- クロップ機能用の関数 ---
+  const handleFileSelectForCrop = (file: File) => {
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        setImageToCrop(reader.result?.toString() || null);
+        setCropModalOpen(true);
+      });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    imgRef.current = e.currentTarget;
+    const { width, height } = e.currentTarget;
+    const minDim = Math.min(width, height); // 辺の短い方を基準にする
+    const initialCrop: PixelCrop = {
+      unit: 'px', // 'px' 固定なので PixelCrop を使用
+      x: (width - minDim) / 2, // 中央に配置
+      y: (height - minDim) / 2, // 中央に配置
+      width: minDim,
+      height: minDim,
+    };
+    setCrop(initialCrop);
+    setCompletedCrop(initialCrop);
+  };
+
+  const handleCropConfirm = async () => {
+    if (!completedCrop || !imgRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const image = imgRef.current;
+    const canvas = canvasRef.current;
+    const cropData = completedCrop;
+
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+
+    canvas.width = cropData.width;
+    canvas.height = cropData.height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      ctx.drawImage(
+        image,
+        cropData.x * scaleX,
+        cropData.y * scaleY,
+        cropData.width * scaleX,
+        cropData.height * scaleY,
+        0,
+        0,
+        cropData.width,
+        cropData.height
+      );
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+          // 先にアップロード処理を開始し、完了を待たずにモーダルを閉じる
+          handleAvatarUpload(croppedFile);
+          setCropModalOpen(false);
+          setImageToCrop(null);
+        }
+      }, 'image/jpeg');
+    }
+  };
+  // --- ここまで ---
 
   const handleAvatarUpload = async (file: File) => {
     if (!profile) return;
@@ -159,6 +203,12 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+
+      // クロージャの問題を避けるため、ref経由で常に最新のURLを取得する
+      const oldUrl = avatarUrlRef.current ? String(avatarUrlRef.current).split('?')[0] : null;
+      if (oldUrl) {
+        formData.append('oldAvatarUrl', oldUrl);
+      }
 
       const response = await fetch('/api/upload-avatar', {
         method: 'POST',
@@ -194,7 +244,7 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
       }
 
       // 3. UIの状態を更新
-      setAvatarUrl(newCacheBustedUrl);
+      setProfile((prev) => ({ ...prev, avatar_url: newCacheBustedUrl }));
 
       toast.success('アバター画像を更新しました。');
     } catch (error) {
@@ -206,24 +256,24 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
   };
   const handleSexualityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = e.target;
-    setSexualities((prev) => {
-      const prevSexualities = prev || [];
+    setProfile((prev) => {
+      const prevSexualities = prev.sexualities || [];
       if (checked) {
-        return [...prevSexualities, value];
+        return { ...prev, sexualities: [...prevSexualities, value] };
       } else {
-        return prevSexualities.filter((item) => item !== value);
+        return { ...prev, sexualities: prevSexualities.filter((item) => item !== value) };
       }
     });
   };
 
   const handleHobbyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = e.target;
-    setHobbies((prev) => {
-      const prevHobbies = prev || [];
+    setProfile((prev) => {
+      const prevHobbies = prev.hobbies || [];
       if (checked) {
-        return [...prevHobbies, value];
+        return { ...prev, hobbies: [...prevHobbies, value] };
       } else {
-        return prevHobbies.filter((item) => item !== value);
+        return { ...prev, hobbies: prevHobbies.filter((item) => item !== value) };
       }
     });
   };
@@ -353,10 +403,11 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
 
         <div className="flex justify-center">
           <Avatar
+            key={profile.avatar_url} // URLが変わるたびにコンポーネントを強制的に再生成
             uid={profile.id}
-            url={avatar_url}
+            url={profile.avatar_url}
             size={150}
-            onFileSelect={handleAvatarUpload}
+            onFileSelect={handleFileSelectForCrop}
             isUploading={isAvatarUploading}
           />
         </div>
@@ -372,8 +423,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
               <input
                 id="username"
                 type="text"
-                value={username || ''}
-                onChange={(e) => setUsername(e.target.value)}
+                value={profile.username || ''}
+                onChange={(e) => setProfile((p) => ({ ...p, username: e.target.value }))}
                 autoComplete="username"
                 className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                 required
@@ -383,8 +434,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
               <SelectInput
                 id="location"
                 label="居住地"
-                value={location || ''}
-                onChange={(e) => setLocation(e.target.value)}
+                value={profile.location || ''}
+                onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))}
                 options={locationOptions}
                 required
                 autoComplete="address-level1"
@@ -395,8 +446,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                 </label>
                 <select
                   id="age"
-                  value={age || ''}
-                  onChange={(e) => setAge(Number(e.target.value))}
+                  value={profile.age || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, age: Number(e.target.value) }))}
                   className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                   required
                 >
@@ -423,7 +474,7 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                       type="checkbox"
                       id={`sexuality-${opt}`}
                       value={opt}
-                      checked={(sexualities || []).includes(opt)}
+                      checked={(profile.sexualities || []).includes(opt)}
                       onChange={handleSexualityChange}
                       className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
                     />
@@ -440,8 +491,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
               </label>
               <select
                 id="vibe"
-                value={vibe || ''}
-                onChange={(e) => setVibe(e.target.value)}
+                value={profile.vibe || ''}
+                onChange={(e) => setProfile((p) => ({ ...p, vibe: e.target.value }))}
                 className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                 required
               >
@@ -464,8 +515,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
               </label>
               <select
                 id="position"
-                value={position || ''}
-                onChange={(e) => setPosition(e.target.value)}
+                value={profile.position || ''}
+                onChange={(e) => setProfile((p) => ({ ...p, position: e.target.value }))}
                 className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                 required
               >
@@ -489,8 +540,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                 </label>
                 <select
                   id="partner_status"
-                  value={partnerStatus || ''}
-                  onChange={(e) => setPartnerStatus(e.target.value)}
+                  value={profile.partner_status || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, partner_status: e.target.value }))}
                   className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                   required
                 >
@@ -513,8 +564,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                 </label>
                 <select
                   id="marital_status"
-                  value={maritalStatus || ''}
-                  onChange={(e) => setMaritalStatus(e.target.value)}
+                  value={profile.marital_status || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, marital_status: e.target.value }))}
                   className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                   required
                 >
@@ -541,7 +592,7 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                       type="checkbox"
                       id={`hobby-${opt}`}
                       value={opt}
-                      checked={(hobbies || []).includes(opt)}
+                      checked={(profile.hobbies || []).includes(opt)}
                       onChange={handleHobbyChange}
                       className="h-4 w-4 rounded border-gray-500 bg-gray-700/50 text-pink-600 focus:ring-pink-500/50 accent-pink-600"
                     />
@@ -585,8 +636,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                     id="bio"
                     rows={5}
                     maxLength={200}
-                    value={bio || ''}
-                    onChange={(e) => setBio(e.target.value)}
+                    value={profile.bio || ''}
+                    onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
                     className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                   />
                 </div>
@@ -597,8 +648,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                     </label>
                     <select
                       id="drinking"
-                      value={drinking || ''}
-                      onChange={(e) => setDrinking(e.target.value)}
+                      value={profile.drinking || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, drinking: e.target.value }))}
                       className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                     >
                       <option value="">選択してください</option>
@@ -620,8 +671,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                     </label>
                     <select
                       id="smoking"
-                      value={smoking || ''}
-                      onChange={(e) => setSmoking(e.target.value)}
+                      value={profile.smoking || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, smoking: e.target.value }))}
                       className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                     >
                       <option value="">選択してください</option>
@@ -643,8 +694,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                     </label>
                     <select
                       id="dating_experience"
-                      value={datingExperience || ''}
-                      onChange={(e) => setDatingExperience(e.target.value)}
+                      value={profile.dating_experience || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, dating_experience: e.target.value }))}
                       className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                     >
                       <option value="">選択してください</option>
@@ -666,8 +717,8 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
                     </label>
                     <select
                       id="mbti"
-                      value={mbti || ''}
-                      onChange={(e) => setMbti(e.target.value)}
+                      value={profile.mbti || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, mbti: e.target.value }))}
                       className="w-full p-3 text-white bg-gray-700/50 border border-gray-600 rounded-lg appearance-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors"
                     >
                       <option value="">選択してください</option>
@@ -715,6 +766,51 @@ export default function Account({ profile: initialProfile }: AccountPageProps) {
           </div>
         </form>
       </div>
+
+      {/* --- 画像クロップ用モーダル --- */}
+      {cropModalOpen && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl w-full max-w-lg shadow-xl flex flex-col max-h-[calc(100vh-5rem)]">
+            <h2 className="text-xl font-semibold text-white p-6 pb-4">画像を切り抜く</h2>
+            <div className="flex justify-center">
+              {imageToCrop && (
+                <ReactCrop
+                  crop={crop}
+                  onChange={(_, percentCrop) => setCrop(percentCrop)}
+                  onComplete={(c) => setCompletedCrop(c)}
+                  aspect={1}
+                  circularCrop
+                >
+                  <img
+                    ref={imgRef}
+                    alt="Crop me"
+                    src={imageToCrop}
+                    onLoad={onImageLoad}
+                    style={{ maxHeight: '60vh' }}
+                  />
+                </ReactCrop>
+              )}
+            </div>
+            <div className="flex justify-end gap-4 p-6 pt-4 mt-auto">
+              <button
+                onClick={() => setCropModalOpen(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleCropConfirm}
+                disabled={isAvatarUploading}
+                className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-full transition-colors disabled:opacity-50"
+              >
+                {isAvatarUploading ? '処理中...' : '決定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* プレビュー用の非表示Canvas */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
     </PageLayout>
   );
 }
