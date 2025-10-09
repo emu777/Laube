@@ -18,6 +18,12 @@ const nextConfig = {
         hostname: 'laube777.com',
         pathname: '/avatars/images/**',
       },
+      // 新しいAPIサブドメインの画像用
+      {
+        protocol: 'https',
+        hostname: 'api.laube777.com',
+        pathname: '/avatars/images/**',
+      },
     ],
   },
 };

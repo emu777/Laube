@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     formData.append('file', fileStream, file.originalFilename || 'upload.jpg');
 
     // PHPスクリプトのエンドポイントURL
-    const uploadUrl = 'https://laube777.com/avatars/img_upload.php'; // Xserverに設置したimg_upload.phpの正しいURL
+    const uploadUrl = 'https://api.laube777.com/avatars/img_upload.php';
 
     const response = await fetch(uploadUrl, {
       method: 'POST',
@@ -102,11 +102,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (
         oldAvatarUrl &&
         typeof oldAvatarUrl === 'string' &&
-        oldAvatarUrl.startsWith('https://laube777.com/avatars/images/')
+        (oldAvatarUrl.startsWith('https://api.laube777.com/avatars/images/') ||
+          oldAvatarUrl.startsWith('https://laube777.com/avatars/images/'))
       ) {
         try {
           const oldUrlToDelete = oldAvatarUrl.split('?')[0]; // キャッシュバスティング用のクエリを除去
-          const deleteResponse = await fetch('https://laube777.com/avatars/delete_avatar.php', {
+          const deleteResponse = await fetch('https://api.laube777.com/avatars/delete_avatar.php', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
