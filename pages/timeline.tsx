@@ -35,8 +35,7 @@ type Comment = {
   user_id: string;
   content: string;
   created_at: string;
-  username: string | null; // PHP APIから直接取得
-  avatar_url: string | null; // PHP APIから直接取得
+  profiles: Profile | null;
 };
 
 type Post = {
@@ -137,10 +136,15 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts, error: initia
       toast.error('投稿に失敗しました。');
       console.error('Error creating post:', await res.text());
     } else {
+      const newPost: Post = await res.json();
       setNewPostContent('');
       setIsFormOpen(false);
       toast.success('投稿しました！');
-      mutate(); // データを再検証してUIを更新
+      // mutate(); // データを再検証してUIを更新
+      // ★★★ 修正点: ローカルのキャッシュを即座に更新する ★★★
+      mutate((currentPosts = []) => [newPost, ...currentPosts], {
+        revalidate: false, // この更新後、再検証は行わない
+      });
     }
   };
 
@@ -352,11 +356,11 @@ const TimelinePage: NextPage<TimelinePageProps> = ({ initialPosts, error: initia
                                 href={{ pathname: '/profile/[id]', query: { id: comment.user_id } }}
                                 className="flex-shrink-0"
                               >
-                                <AvatarIcon avatarUrlPath={comment.avatar_url} size={32} />
+                                <AvatarIcon avatarUrlPath={comment.profiles?.avatar_url} size={32} />
                               </Link>
                             )}
                             <div className="flex-1 bg-gray-700/50 rounded-lg px-3 py-2">
-                              <p className="text-sm font-bold">{comment.username || '匿名さん'}</p>
+                              <p className="text-sm font-bold">{comment.profiles?.username || '匿名さん'}</p>
                               <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap break-words">
                                 {comment.content}
                               </p>
