@@ -83,8 +83,6 @@ const ChatRoomPage = () => {
       false
     );
 
-    setNewMessage('');
-
     const res = await fetch(`${API_URL}/create_chat_message.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -94,6 +92,8 @@ const ChatRoomPage = () => {
         content: newMessage,
       }),
     });
+
+    setNewMessage('');
 
     if (!res.ok) {
       // エラーハンドリング
