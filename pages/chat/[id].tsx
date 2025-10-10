@@ -104,8 +104,10 @@ const ChatRoomPage = () => {
       const savedMessage = await res.json();
       mutate(
         `${API_URL}/get_chat_messages.php?room_id=${roomId}`,
-        (currentMessages: Message[] | undefined = []) =>
-          currentMessages.map((msg) => (msg.id === tempId ? savedMessage : msg)),
+        (currentMessages: Message[] | undefined = []) => {
+          const newMessages = currentMessages.filter((msg) => msg.id !== tempId);
+          return [...newMessages, savedMessage];
+        },
         false
       );
     }
