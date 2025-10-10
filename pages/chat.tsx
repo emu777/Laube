@@ -28,6 +28,8 @@ type ChatRoom = {
   unread_count: number;
 };
 
+const API_URL = 'https://api.laube777.com/chat'; // チャットAPIのベースURL
+
 type ChatPageProps = {
   error?: string;
 };
@@ -35,6 +37,8 @@ type ChatPageProps = {
 const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
   const supabase = useSupabase();
   const [user, setUser] = useState<User | null>(null);
+
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -46,31 +50,15 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
     fetchUser();
   }, [supabase]);
 
-  const fetcher = async () => {
-    if (!user) return [];
-
-    // 1. ブロック関係にあるユーザーIDのリストを取得
-    const { data: blocksData } = await supabase
-      .from('blocks')
-      .select('blocker_id,blocked_id')
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-    const blockedUserIds = new Set<string>();
-    if (blocksData) {
-      for (const block of blocksData) {
-        if (block.blocker_id === user.id) blockedUserIds.add(block.blocked_id);
-        if (block.blocked_id === user.id) blockedUserIds.add(block.blocker_id);
-      }
-    }
-
-    // 2. チャットルームを取得
-    const { data, error } = await supabase.rpc('get_chat_rooms_with_details', { p_user_id: user.id });
-    if (error) throw error;
-
-    // 3. ブロックしたユーザーのチャットルームを除外
-    return (data as ChatRoom[]).filter((room: ChatRoom) => !blockedUserIds.has(room.other_user.id));
-  };
-
-  const { data: chatRooms, error, isLoading } = useSWR<ChatRoom[]>('chat_rooms', fetcher);
+  // useSWRで新しいPHP APIを叩くように変更
+  const {
+    data: chatRooms,
+    error,
+    isLoading,
+  } = useSWR<ChatRoom[]>(
+    user ? `${API_URL}/get_chat_rooms.php?user_id=${user.id}` : null, // userが取得できてからfetch
+    fetcher
+  );
 
   if (!user) return null;
 

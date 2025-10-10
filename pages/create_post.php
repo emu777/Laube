@@ -18,12 +18,12 @@ if (!$userId || !$content) {
 
 try {
     // 1. 投稿を挿入
-    $stmt = $pdo_xserver->prepare("INSERT INTO posts (user_id, content) VALUES (?, ?)");
+    $stmt = $pdo_xserver_timeline->prepare("INSERT INTO posts (user_id, content) VALUES (?, ?)");
     $stmt->execute([$userId, $content]);
-    $newPostId = $pdo_xserver->lastInsertId();
+    $newPostId = $pdo_xserver_timeline->lastInsertId();
 
     // 2. 挿入した投稿を取得
-    $post_stmt = $pdo_xserver->prepare("
+    $post_stmt = $pdo_xserver_timeline->prepare("
         SELECT 
             p.id, p.user_id, p.content, p.created_at
         FROM posts p

@@ -5,11 +5,17 @@ error_reporting(E_ALL);
 
 // --- Xserverのデータベース接続情報 ---
 $xserver_host = 'localhost'; // またはXserver指定のホスト名
-$xserver_dbname = 'laube777_laubetimeline001';
 $xserver_user = 'laube777_owner';
 $xserver_password = 'osa151515'; // 正しいパスワードを設定してください
 
-$xserver_dsn = "mysql:host=$xserver_host;dbname=$xserver_dbname;charset=utf8mb4";
+// --- Timelineデータベース ---
+$xserver_timeline_dbname = 'laube777_laubetimeline001'; // タイムライン用DB名
+$xserver_timeline_dsn = "mysql:host=$xserver_host;dbname=$xserver_timeline_dbname;charset=utf8mb4";
+
+// --- Chatデータベース ---
+$xserver_chat_dbname = 'laube777_laubechat001'; // ★チャット用に新しく作成したDB名
+$xserver_chat_dsn = "mysql:host=$xserver_host;dbname=$xserver_chat_dbname;charset=utf8mb4";
+
 // --- Supabaseのデータベース接続情報 ---
 // Supabaseのプロジェクト設定 > Database > Connection string から取得
 $supabase_host = 'aws-1-ap-northeast-1.pooler.supabase.com'; // Transaction Poolerのホスト
@@ -27,7 +33,8 @@ $options = [
 
 // データベース接続の確立
 try {
-    $pdo_xserver = new PDO($xserver_dsn, $xserver_user, $xserver_password, $options);
+    $pdo_xserver_timeline = new PDO($xserver_timeline_dsn, $xserver_user, $xserver_password, $options);
+    $pdo_xserver_chat = new PDO($xserver_chat_dsn, $xserver_user, $xserver_password, $options);
     $pdo_supabase = new PDO($supabase_dsn, null, null, $options);
 } catch (PDOException $e) {
     http_response_code(500);

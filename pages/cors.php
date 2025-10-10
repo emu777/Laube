@@ -7,7 +7,7 @@ error_reporting(E_ALL);
 $allowed_origins = [
     'http://localhost:3000', // 開発環境
     'https://laube777.com',     // 本番環境のドメイン
-    'https://laube-777.netlify.app' 
+    'https://laube-777.netlify.app' // NetlifyのプレビューURL
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';

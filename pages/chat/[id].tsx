@@ -1,11 +1,15 @@
-import { GetServerSidePropsContext, NextPage } from 'next';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { useSupabase } from '@/contexts/SupabaseContext';
 import { useRouter } from 'next/router';
-import { useEffect, useState, useRef } from 'react';
-import { serialize, parse } from 'cookie';
-import AvatarIcon from '@/components/AvatarIcon';
+import { useState, useEffect, useRef } from 'react';
+import useSWR, { useSWRConfig } from 'swr';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
+import AvatarIcon from '@/components/AvatarIcon';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import { IoSend, IoChevronBack } from 'react-icons/io5';
+import Link from 'next/link';
+
+const API_URL = 'https://api.laube777.com/chat';
 
 type Profile = {
   id: string;
@@ -14,27 +18,32 @@ type Profile = {
 };
 
 type Message = {
-  id: number;
-  created_at: string;
+  id: string;
   room_id: string;
   sender_id: string;
   content: string;
-  sender: Profile;
+  created_at: string;
+  is_read: boolean;
+  sender: Profile | null;
 };
 
-type ChatRoomPageProps = {
-  initialMessages: Message[];
-  otherUser: Profile | null;
-  roomId: string;
-};
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser, roomId }) => {
-  const supabase = useSupabase();
-  const [user, setUser] = useState<User | null>(null);
+const ChatRoomPage = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState(initialMessages);
+  const { id: roomId } = router.query;
+  const supabase = useSupabase();
+  const { mutate } = useSWRConfig();
+
+  const [user, setUser] = useState<User | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const {
+    data: messages,
+    error,
+    isLoading,
+  } = useSWR<Message[]>(roomId ? `${API_URL}/get_chat_messages.php?room_id=${roomId}` : null, fetcher);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -44,231 +53,118 @@ const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ initialMessages, otherUser,
     fetchUser();
   }, [supabase]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    // メッセージの末尾にスクロール
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // このルームに入室したときに、既読情報を更新する
-  useEffect(() => {
-    if (user && roomId) {
-      const markAsRead = async () => {
-        await supabase.from('read_receipts').upsert({
-          room_id: roomId,
-          user_id: user.id,
-          last_read_at: new Date().toISOString(),
-        });
-      };
-      markAsRead();
-    }
-  }, [user, roomId, supabase]);
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !user || !roomId) return;
 
-  useEffect(() => {
-    const channel = supabase
-      // このルーム専用の一意で固定のチャンネル名を指定
-      .channel(`chat-room:${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const newMessage = payload.new as Omit<Message, 'sender'>;
-          const senderProfile =
-            newMessage.sender_id === user?.id
-              ? ({
-                  id: user.id,
-                  username: user.user_metadata.username,
-                  avatar_url: user.user_metadata.avatar_url,
-                } as Profile)
-              : otherUser;
-
-          if (senderProfile) {
-            setMessages((currentMessages) => [...currentMessages, { ...newMessage, sender: senderProfile as Profile }]);
-          }
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime channel error:', err);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      room_id: String(roomId),
+      sender_id: user.id,
+      content: newMessage,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      sender: {
+        id: user.id,
+        username: user.user_metadata.username,
+        avatar_url: user.user_metadata.avatar_url,
+      },
     };
-  }, [supabase, roomId, user, otherUser]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user || !otherUser) return;
+    // 楽観的更新
+    mutate(
+      `${API_URL}/get_chat_messages.php?room_id=${roomId}`,
+      (currentMessages: Message[] | undefined = []) => [...currentMessages, optimisticMessage],
+      false
+    );
 
-    const { error } = await supabase // prettier-ignore
-      .from('messages')
-      .insert({ content: newMessage, room_id: roomId, sender_id: user.id });
+    setNewMessage('');
 
-    if (error) {
-      console.error('Error sending message:', error);
-      alert('メッセージの送信に失敗しました。');
-    } else {
-      setNewMessage('');
-    }
-
-    // 相手に通知を送信
-    await Promise.all([
-      supabase.from('notifications').insert({
-        recipient_id: otherUser.id,
+    const res = await fetch(`${API_URL}/create_chat_message.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        room_id: roomId,
         sender_id: user.id,
-        type: 'message',
-        reference_id: roomId,
-        content_preview: newMessage.substring(0, 50),
+        content: newMessage,
       }),
-      supabase.functions.invoke('send-push-notification', {
-        // prettier-ignore
-        body: {
-          recipient_id: otherUser.id,
-          title: `${user.user_metadata.username || '匿名さん'}さんから新着メッセージ`,
-          body: newMessage.substring(0, 50),
-          tag: `chat-${roomId}`,
-          href: `/chat/${roomId}`,
-        },
-      }),
-    ]);
+    });
+
+    if (!res.ok) {
+      // エラーハンドリング
+      console.error('Failed to send message');
+      mutate(`${API_URL}/get_chat_messages.php?room_id=${roomId}`); // サーバーの状態に戻す
+    } else {
+      // 成功したらサーバーからのレスポンスでキャッシュを更新
+      const savedMessage = await res.json();
+      mutate(
+        `${API_URL}/get_chat_messages.php?room_id=${roomId}`,
+        (currentMessages: Message[] | undefined = []) =>
+          currentMessages.map((msg) => (msg.id === tempId ? savedMessage : msg)),
+        false
+      );
+    }
   };
 
-  if (!otherUser) {
-    return <div>ユーザーが見つかりません。</div>;
-  }
+  const otherUser = messages?.find((m) => m.sender_id !== user?.id)?.sender;
 
   return (
-    <div className="bg-gray-900 flex flex-col h-screen text-white">
-      <header className="fixed top-0 left-0 right-0 p-4 flex items-center gap-4 bg-gray-900/80 backdrop-blur-sm z-40 border-b border-gray-700 h-20">
-        <button onClick={() => router.back()} className="text-white" aria-label="戻る">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <AvatarIcon avatarUrlPath={otherUser.avatar_url} size={40} />
-        <h1 className="text-lg font-bold truncate">{otherUser.username || '未設定'}</h1>
+    <div className="flex flex-col h-screen bg-gray-900 text-white">
+      <header className="bg-gray-800/80 backdrop-blur-sm p-4 flex items-center gap-4 sticky top-0 z-10">
+        <Link href="/chat" className="p-2 -ml-2">
+          <IoChevronBack size={24} />
+        </Link>
+        {otherUser && <AvatarIcon avatarUrlPath={otherUser.avatar_url} size={40} />}
+        <h1 className="text-lg font-bold truncate">{otherUser?.username || 'チャット'}</h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto pt-20 pb-24 px-4 space-y-4">
-        {messages.map((message) => {
-          const isMe = message.sender_id === user?.id;
-          return (
-            <div key={message.id} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-              {!isMe && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
-              <div
-                className={`max-w-xs md:max-w-md p-3 rounded-2xl ${isMe ? 'bg-pink-600 rounded-br-md' : 'bg-gray-700 rounded-bl-md'}`}
-              >
-                <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-              </div>
+      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isLoading && <p className="text-center">メッセージを読み込み中...</p>}
+        {error && <p className="text-center text-red-400">エラーが発生しました。</p>}
+        {messages?.map((message) => (
+          <div
+            key={message.id}
+            className={`flex items-end gap-3 ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+          >
+            {message.sender_id !== user?.id && <AvatarIcon avatarUrlPath={message.sender?.avatar_url} size={32} />}
+            <div
+              className={`max-w-xs md:max-w-md p-3 rounded-2xl ${
+                message.sender_id === user?.id ? 'bg-pink-600 rounded-br-lg' : 'bg-gray-700 rounded-bl-lg'
+              }`}
+            >
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
             </div>
-          );
-        })}
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm z-30 p-2 border-t border-gray-700">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+      <footer className="bg-gray-800 p-4 sticky bottom-0">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="メッセージを入力..."
-            className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-full focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-colors text-base px-4"
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder="メッセージを入力"
+            className="flex-1 bg-gray-700 p-3 rounded-full border-none focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-white px-4"
           />
           <button
-            type="submit"
+            onClick={handleSendMessage}
             disabled={!newMessage.trim()}
-            className="p-3 rounded-full bg-pink-600 text-white disabled:opacity-50 hover:bg-pink-700 transition-colors"
-            aria-label="送信"
+            className="bg-pink-600 text-white rounded-full p-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-pink-700"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
+            <IoSend size={20} />
           </button>
-        </form>
+        </div>
       </footer>
     </div>
   );
 };
 
 export default ChatRoomPage;
-
-export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => {
-          const parsedCookies = parse(ctx.req.headers.cookie || '');
-          return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
-        },
-        setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
-          ctx.res.setHeader(
-            'Set-Cookie',
-            cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
-          );
-        },
-      },
-    }
-  );
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { redirect: { destination: '/login', permanent: false } };
-  }
-
-  const { id: roomId } = ctx.params as { id: string };
-
-  // チャットルームの存在と参加者を確認
-  const { data: room, error: roomError } = await supabase
-    .from('chat_rooms')
-    .select('*, user1:profiles!user1_id(*), user2:profiles!user2_id(*)')
-    .eq('id', roomId)
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single();
-
-  if (roomError || !room) {
-    return { notFound: true };
-  }
-
-  // メッセージを取得
-  const { data: messages, error: messagesError } = await supabase
-    .from('messages')
-    .select('*, sender:sender_id(id, username, avatar_url)')
-    .eq('room_id', roomId)
-    .order('created_at', { ascending: true });
-
-  if (messagesError) {
-    console.error('Error fetching messages:', messagesError);
-    return { notFound: true };
-  }
-
-  const otherUser = room.user1.id === user.id ? room.user2 : room.user1;
-
-  return {
-    props: {
-      initialMessages: messages || [],
-      otherUser: otherUser || null,
-      roomId,
-    },
-  };
-};

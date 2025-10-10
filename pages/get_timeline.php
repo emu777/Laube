@@ -1,13 +1,10 @@
 <?php
-
 require 'cors.php'; // CORS設定を読み込む
 require 'db_connect.php'; // データベース接続を読み込む
 
-$output = null; // ★ 2. 出力用の変数を初期化
-
 try {
-    // 1. Xserverから投稿(posts)とコメント(comments)を取得 (出力バッファリングは不要)
-    $posts_stmt = $pdo_xserver->query("
+    // 1. Xserverから投稿(posts)とコメント(comments)を取得
+    $posts_stmt = $pdo_xserver_timeline->query("
         SELECT 
             p.id, p.user_id, p.content, p.created_at
         FROM posts p
@@ -15,7 +12,7 @@ try {
     ");
     $posts = $posts_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $comments_stmt = $pdo_xserver->prepare("
+    $comments_stmt = $pdo_xserver_timeline->prepare("
         SELECT 
             c.id, c.post_id, c.user_id, c.content, c.created_at
         FROM comments c
@@ -73,14 +70,12 @@ try {
     }
     unset($post);
 
-    $output = json_encode($posts); // ★ 3. 直接echoせず、変数に格納
+    header('Content-Type: application/json; charset=utf-8'); // ヘッダーを送信
+    echo json_encode($posts);
 
 } catch (Exception $e) {
     http_response_code(500);
     // エラーの詳細を出力してデバッグしやすくする
-    $output = json_encode(['error' => 'An error occurred: ' . $e->getMessage(), 'trace' => $e->getTraceAsString()]); // ★ 4. こちらも変数に格納
+    header('Content-Type: application/json; charset=utf-8'); // ヘッダーを送信
+    echo json_encode(['error' => 'An error occurred: ' . $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 }
-
-header('Content-Type: application/json; charset=utf-8'); // ヘッダーを送信
-
-echo $output; // 最後にクリーンなJSONデータだけを出力
