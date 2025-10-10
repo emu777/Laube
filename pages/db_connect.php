@@ -1,6 +1,6 @@
 <?php
 // エラーレポートを有効にする（開発時のみ）
-ini_set('display_errors', 0); // 画面にエラーを表示しない
+ini_set('display_errors', 1); // 画面にエラーを表示する
 error_reporting(E_ALL);
 
 // --- Xserverのデータベース接続情報 ---
