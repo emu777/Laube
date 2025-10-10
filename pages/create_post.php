@@ -1,8 +1,8 @@
 <?php
 require 'cors.php'; // CORS設定を読み込む
 require 'db_connect.php'; // データベース接続を読み込む
-
-header('Content-Type: application/json; charset=utf-8'); // require の後に移動
+ 
+header('Content-Type: application/json; charset=utf-8');
 
 // フロントエンドから送信されたJSONデータを取得
 $data = json_decode(file_get_contents('php://input'), true);
