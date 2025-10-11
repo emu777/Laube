@@ -71,26 +71,19 @@ export default function MyApp({
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange((event, session) => {
-      // Google認証などのOAuthプロバイダからのリダイレクト後、
-      // URLのハッシュ(#)にアクセストークンが含まれている場合にSIGNED_INイベントが発生します。
-      // このタイミングで一度だけトップページに遷移させ、URLからハッシュを消去します。
-      // window.location.assign('/') を使うと無限リロードの原因になることがあるため、
-      // router.push('/') を使用します。
-      if (event === 'SIGNED_IN') {
-        // Google認証からのリダイレクト直後（URLにaccess_tokenがある）はページをリロードしてセッションを確実に同期
-        if (window.location.hash.includes('access_token')) {
-          window.location.reload();
-        } else {
-          // メール認証後などは現在のページを再取得して同期
-          router.replace(router.asPath);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        // ログアウト時もページの再取得を行い、ログインページへリダイレクトさせる
-        router.replace(router.asPath);
+      // ログアウト時にSWRのキャッシュを全てクリアします。
+      // これにより、再ログイン時に古いユーザーのデータが表示されるのを防ぎます。
+      // ログイン時やセッション復元時には、各ページのSWRが自動で再検証するため、
+      // ここでキャッシュをクリアしたり、ページ遷移を強制する必要はありません。
+      if (event === 'SIGNED_OUT') {
+        // mutateの第一引数に () => true を渡すことで、全てのSWRキャッシュを対象にします。
+        // 第二引数に undefined, 第三引数で revalidate: false を指定することで、
+        // 再検証せずにキャッシュをクリア（削除）できます。
+        mutate(() => true, undefined, { revalidate: false });
       }
     });
     return () => subscription.unsubscribe();
-  }, [supabaseClient, router]); // 依存配列を修正
+  }, [supabaseClient, mutate]);
 
   // NavigationGuardContext の実装
   const navigationGuardContextValue = {

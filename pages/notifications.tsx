@@ -63,7 +63,10 @@ const getNotificationInfo = (notification: Notification) => {
       return {
         icon: <FaEnvelope className="text-green-400" />,
         message: `${senderName}さんからトークが届いています`,
-        href: `/chat/${notification.reference_id}`,
+        href: {
+          pathname: '/chat/[id]',
+          query: { id: notification.reference_id },
+        },
       };
     default:
       return {
@@ -137,7 +140,12 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
       }
     }
 
-    router.push(notification.href);
+    // ★★★ 修正点: hrefがオブジェクトの場合と文字列の場合で処理を分ける ★★★
+    if (typeof notification.href === 'string') {
+      router.push(notification.href);
+    } else if (typeof notification.href === 'object') {
+      router.push({ pathname: notification.href.pathname, query: notification.href.query });
+    }
   };
 
   return (
@@ -199,8 +207,12 @@ const NotificationsPage: NextPage<NotificationsPageProps> = ({ notifications: se
                 const { icon, message, href } = getNotificationInfo(notification as Notification);
                 return (
                   <div
+                    // ★★★ 修正点: href.query.id が存在しない場合はクリックイベントを無効化 ★★★
+                    // (より安全なのはLinkコンポーネントを使うことですが、既存の構造を維持します)
+                    onClick={() =>
+                      typeof href !== 'string' && href.query.id && handleNotificationClick({ ...notification, href })
+                    }
                     key={notification.id}
-                    onClick={() => handleNotificationClick({ ...notification, href })}
                     className={`flex items-center gap-4 p-4 rounded-xl transition-colors cursor-pointer ${
                       notification.is_read ? 'bg-gray-800/50' : 'bg-pink-900/20 border border-pink-800/50'
                     } hover:bg-gray-700/60`}

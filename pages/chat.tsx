@@ -1,12 +1,8 @@
 import { GetServerSidePropsContext, NextPage } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { serialize, parse } from 'cookie';
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AvatarIcon from '@/components/AvatarIcon';
-import useSWR from 'swr';
-import { useSupabase } from '@/contexts/SupabaseContext';
-import type { User } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -28,39 +24,15 @@ type ChatRoom = {
   unread_count: number;
 };
 
-const API_URL = 'https://api.laube777.com/chat'; // チャットAPIのベースURL
-
 type ChatPageProps = {
+  chatRooms: ChatRoom[];
   error?: string;
 };
 
-const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
-  const supabase = useSupabase();
-  const [user, setUser] = useState<User | null>(null);
-
-  const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    fetchUser();
-  }, [supabase]);
-
-  // useSWRで新しいPHP APIを叩くように変更
-  const {
-    data: chatRooms,
-    error,
-    isLoading,
-  } = useSWR<ChatRoom[]>(
-    user ? `${API_URL}/get_chat_rooms.php?user_id=${user.id}` : null, // userが取得できてからfetch
-    fetcher
-  );
-
-  if (!user) return null;
+const ChatPage: NextPage<ChatPageProps> = ({ chatRooms, error: initialError }) => {
+  // getServerSidePropsから渡されたデータを直接使用
+  const error = initialError;
+  const isLoading = !chatRooms && !error;
 
   return (
     <div className="bg-gray-900 min-h-screen text-white overflow-x-hidden">
@@ -71,8 +43,8 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
           {/* エラー表示 */}
           {(error || initialError) && (
             <div className="bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-lg mb-6">
-              <p className="font-bold">データ取得エラー</p>
-              <p className="text-sm mt-1">{error?.message || initialError}</p>
+              <p className="font-bold">エラー</p>
+              <p className="text-sm mt-1">{error || initialError}</p>
             </div>
           )}
 
@@ -80,35 +52,42 @@ const ChatPage: NextPage<ChatPageProps> = ({ error: initialError }) => {
 
           {chatRooms && chatRooms.length > 0 ? (
             <div className="space-y-2">
-              {chatRooms.map((room) => (
-                <Link
-                  key={room.id}
-                  href={`/chat/${room.id}`}
-                  className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-700/60 transition-colors"
-                >
-                  <AvatarIcon avatarUrlPath={room.other_user.avatar_url} size={56} />
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-between items-baseline">
-                      <p className="font-bold text-white truncate">{room.other_user.username || '未設定'}</p>
-                      {room.last_message && (
-                        <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                          {formatDistanceToNow(new Date(room.last_message.created_at), { addSuffix: true, locale: ja })}
+              {chatRooms.map((room) => {
+                // ★★★ 修正点: room と room.id が存在しない場合はリンクをレンダリングしない ★★★
+                if (!room || !room.id) return null;
+                return (
+                  <Link
+                    key={room.id}
+                    href={`/chat/${room.id}`}
+                    className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-700/60 transition-colors"
+                  >
+                    <AvatarIcon avatarUrlPath={room.other_user.avatar_url} size={56} />
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-between items-baseline">
+                        <p className="font-bold text-white truncate">{room.other_user.username || '未設定'}</p>
+                        {room.last_message && (
+                          <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                            {formatDistanceToNow(new Date(room.last_message.created_at), {
+                              addSuffix: true,
+                              locale: ja,
+                            })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center mt-0.5">
+                        <p className="text-sm text-gray-400 truncate pr-2">
+                          {room.last_message?.content || 'まだメッセージはありません'}
                         </p>
-                      )}
+                        {room.unread_count > 0 && (
+                          <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-pink-600 text-xs font-bold text-white">
+                            {room.unread_count}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center mt-0.5">
-                      <p className="text-sm text-gray-400 truncate pr-2">
-                        {room.last_message?.content || 'まだメッセージはありません'}
-                      </p>
-                      {room.unread_count > 0 && (
-                        <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-pink-600 text-xs font-bold text-white">
-                          {room.unread_count}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -143,14 +122,32 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
     { cookies }
   );
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  return {
-    props: {},
-  };
+  // タイムラインと同様に、サーバーサイドでPHP APIを叩く
+  try {
+    const res = await fetch(`https://api.laube777.com/api/chat/get_chat_rooms.php?user_id=${user.id}`);
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`APIエラー: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+    const chatRooms = await res.json();
+
+    if (chatRooms.error) {
+      throw new Error(chatRooms.error);
+    }
+
+    return {
+      props: { chatRooms },
+    };
+  } catch (e: any) {
+    return {
+      props: { chatRooms: [], error: e.message },
+    };
+  }
 };

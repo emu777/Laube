@@ -1,15 +1,18 @@
+import { GetServerSidePropsContext, NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import type { User } from '@supabase/supabase-js';
 import AvatarIcon from '@/components/AvatarIcon';
-import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
 import { IoSend, IoChevronBack } from 'react-icons/io5';
 import Link from 'next/link';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { serialize, parse } from 'cookie';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
 
-const API_URL = 'https://api.laube777.com/chat';
+const API_URL = 'https://api.laube777.com/api/chat';
 
 type Profile = {
   id: string;
@@ -17,7 +20,19 @@ type Profile = {
   avatar_url: string | null;
 };
 
-type Message = {
+type LastMessage = {
+  content: string;
+  created_at: string;
+};
+
+type ChatRoom = {
+  id: string;
+  other_user: Profile;
+  last_message: LastMessage | null;
+  unread_count: number;
+};
+
+type ChatMessage = {
   id: string;
   room_id: string;
   sender_id: string;
@@ -27,9 +42,15 @@ type Message = {
   sender: Profile | null;
 };
 
+type ChatRoomPageProps = {
+  room: ChatRoom;
+  initialMessages: ChatMessage[];
+  error?: string;
+};
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const ChatRoomPage = () => {
+const ChatRoomPage: NextPage<ChatRoomPageProps> = ({ room, initialMessages, error: serverError }) => {
   const router = useRouter();
   const { id: roomId } = router.query;
   const supabase = useSupabase();
@@ -43,7 +64,9 @@ const ChatRoomPage = () => {
     data: messages,
     error,
     isLoading,
-  } = useSWR<Message[]>(roomId ? `${API_URL}/get_chat_messages.php?room_id=${roomId}` : null, fetcher);
+  } = useSWR<ChatMessage[]>(roomId ? `${API_URL}/get_chat_messages.php?room_id=${roomId}` : null, fetcher, {
+    fallbackData: initialMessages,
+  });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -54,15 +77,17 @@ const ChatRoomPage = () => {
   }, [supabase]);
 
   useEffect(() => {
-    // メッセージの末尾にスクロール
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user || !roomId) return;
 
+    // 送信するメッセージをローカル変数に保持
+    const messageToSend = newMessage;
+
     const tempId = `temp-${Date.now()}`;
-    const optimisticMessage: Message = {
+    const optimisticMessage: ChatMessage = {
       id: tempId,
       room_id: String(roomId),
       sender_id: user.id,
@@ -79,9 +104,12 @@ const ChatRoomPage = () => {
     // 楽観的更新
     mutate(
       `${API_URL}/get_chat_messages.php?room_id=${roomId}`,
-      (currentMessages: Message[] | undefined = []) => [...currentMessages, optimisticMessage],
+      (currentMessages: ChatMessage[] | undefined = []) => [...currentMessages, optimisticMessage],
       false
     );
+
+    // UIを即座に更新
+    setNewMessage('');
 
     const res = await fetch(`${API_URL}/create_chat_message.php`, {
       method: 'POST',
@@ -89,22 +117,18 @@ const ChatRoomPage = () => {
       body: JSON.stringify({
         room_id: roomId,
         sender_id: user.id,
-        content: newMessage,
+        content: messageToSend, // ローカル変数を使用
       }),
     });
 
-    setNewMessage('');
-
     if (!res.ok) {
-      // エラーハンドリング
       console.error('Failed to send message');
-      mutate(`${API_URL}/get_chat_messages.php?room_id=${roomId}`); // サーバーの状態に戻す
+      mutate(`${API_URL}/get_chat_messages.php?room_id=${roomId}`);
     } else {
-      // 成功したらサーバーからのレスポンスでキャッシュを更新
       const savedMessage = await res.json();
       mutate(
         `${API_URL}/get_chat_messages.php?room_id=${roomId}`,
-        (currentMessages: Message[] | undefined = []) => {
+        (currentMessages: ChatMessage[] | undefined = []) => {
           const newMessages = currentMessages.filter((msg) => msg.id !== tempId);
           return [...newMessages, savedMessage];
         },
@@ -113,7 +137,7 @@ const ChatRoomPage = () => {
     }
   };
 
-  const otherUser = messages?.find((m) => m.sender_id !== user?.id)?.sender;
+  const otherUser = room?.other_user;
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -121,13 +145,15 @@ const ChatRoomPage = () => {
         <Link href="/chat" className="p-2 -ml-2">
           <IoChevronBack size={24} />
         </Link>
-        {otherUser && <AvatarIcon avatarUrlPath={otherUser.avatar_url} size={40} />}
+        {otherUser && <AvatarIcon avatarUrlPath={otherUser?.avatar_url} size={40} />}
         <h1 className="text-lg font-bold truncate">{otherUser?.username || 'チャット'}</h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoading && <p className="text-center">メッセージを読み込み中...</p>}
-        {error && <p className="text-center text-red-400">エラーが発生しました。</p>}
+        {isLoading && !initialMessages && <p className="text-center">メッセージを読み込み中...</p>}
+        {(error || serverError) && (
+          <p className="text-center text-red-400">エラーが発生しました: {serverError || error.message}</p>
+        )}
         {messages?.map((message) => (
           <div
             key={message.id}
@@ -170,3 +196,60 @@ const ChatRoomPage = () => {
 };
 
 export default ChatRoomPage;
+
+export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
+  const { id: roomId } = ctx.params || {};
+  if (!roomId || typeof roomId !== 'string') {
+    return { notFound: true };
+  }
+
+  const cookies = {
+    getAll: () => {
+      const parsedCookies = parse(ctx.req.headers.cookie || '');
+      return Object.entries(parsedCookies).map(([name, value]) => ({ name, value }));
+    },
+    setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+      ctx.res.setHeader(
+        'Set-Cookie',
+        cookiesToSet.map(({ name, value, options }) => serialize(name, value, options))
+      );
+    },
+  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies }
+  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { redirect: { destination: '/login', permanent: false } };
+  }
+
+  try {
+    // タイムラインと同様に、サーバーサイドでPHP APIを並行して叩く
+    const [roomRes, messagesRes] = await Promise.all([
+      fetch(`https://api.laube777.com/api/chat/get_chat_rooms.php?user_id=${user.id}`),
+      fetch(`https://api.laube777.com/api/chat/get_chat_messages.php?room_id=${roomId}`),
+    ]);
+
+    if (!roomRes.ok || !messagesRes.ok) {
+      throw new Error('APIからのデータ取得に失敗しました。');
+    }
+
+    const allRooms: ChatRoom[] = await roomRes.json();
+    const initialMessages: ChatMessage[] = await messagesRes.json();
+
+    const room = allRooms.find((r) => r.id === roomId);
+
+    if (!room) {
+      return { notFound: true };
+    }
+
+    return { props: { room, initialMessages } };
+  } catch (e: any) {
+    return { props: { room: null, initialMessages: [], error: e.message } };
+  }
+};
