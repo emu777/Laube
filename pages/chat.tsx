@@ -131,7 +131,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   // タイムラインと同様に、サーバーサイドでPHP APIを叩く
   try {
-    const res = await fetch(`https://api.laube777.com/api/chat/get_chat_rooms.php?user_id=${user.id}`);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/get_chat_rooms.php?user_id=${user.id}`);
     if (!res.ok) {
       const errorText = await res.text();
       throw new Error(`APIエラー: ${res.status} ${res.statusText} - ${errorText}`);

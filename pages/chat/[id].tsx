@@ -12,7 +12,7 @@ import { serialize, parse } from 'cookie';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-const API_URL = 'https://api.laube777.com/api/chat';
+const API_URL = '/api/chat'; // ★★★ 修正: 相対パスに変更 ★★★
 
 type Profile = {
   id: string;
@@ -231,7 +231,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   try {
     // タイムラインと同様に、サーバーサイドでPHP APIを並行して叩く
     const [roomRes, messagesRes] = await Promise.all([
-      fetch(`https://api.laube777.com/api/chat/get_chat_rooms.php?user_id=${user.id}`),
+      fetch(`https://api.laube777.com/api/chat/get_chat_rooms.php?user_id=${user.id}`), // URLパスを修正
       fetch(`https://api.laube777.com/api/chat/get_chat_messages.php?room_id=${roomId}`),
     ]);
 
@@ -250,6 +250,9 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
     return { props: { room, initialMessages } };
   } catch (e: any) {
-    return { props: { room: null, initialMessages: [], error: e.message } };
+    // APIエラーが発生した場合、ページ自体を404として扱うか、
+    // エラーメッセージを渡してページに表示するかを選択できます。
+    // ここではnotFoundを返し、404ページを表示させます。
+    return { notFound: true };
   }
 };

@@ -52,7 +52,7 @@ type TimelinePageProps = {
   error?: string;
 };
 
-const API_URL = 'https://api.laube777.com/timeline'; // PHP APIのベースURL
+const API_URL = '/api/timeline'; // ★★★ 修正: 相対パスに変更 ★★★
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -481,7 +481,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
 
   // Xserver上のPHP APIからタイムラインデータを取得
   try {
-    const response = await fetch('https://api.laube777.com/timeline/get_timeline.php');
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timeline/get_timeline.php`);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to fetch timeline data: ${errorText}`);

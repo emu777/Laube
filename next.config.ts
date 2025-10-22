@@ -2,39 +2,50 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-      // Supabase Storageの画像用
-      ...(process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? [
-            {
-              protocol: 'https',
-              hostname: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname,
-              port: '',
-              pathname: '/storage/v1/object/public/avatars/**',
-            },
-          ]
-        : []),
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ufncdfxyawpmotgywzeo.supabase.co',
+      },
       // Xserverの画像用
       {
         protocol: 'https',
-        hostname: 'sykos.laube.work', // あなたのXserverのドメイン名
+        hostname: 'laube777.com',
+        pathname: '/avatars/images/**',
+      },
+      // 新しいAPIサブドメインの画像用
+      {
+        protocol: 'https',
+        hostname: 'api.laube777.com',
+        pathname: '/**', // すべてのパスを許可
       },
     ],
   },
-  // ★★★ 修正点: rewrites設定を開発環境でのみ有効になるように修正 ★★★
-  async rewrites() {
-    // 本番環境ではrewritesは不要なため、空の配列を返す
-    if (process.env.NODE_ENV !== 'development') {
-      return [];
-    }
-
-    // 開発環境でのみ、/api/へのリクエストをプロキシする
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://api.laube777.com/:path*', // /api/の重複を避ける
-      },
-    ];
-  },
+  // ★★★ 開発環境でのCORSエラーを回避するための設定 ★★★
+  // ローカル開発環境(/api/...)へのリクエストを、XserverのAPIへ転送(プロキシ)します。
+  // これにより、ブラウザは同一オリジンへのリクエストと認識するため、CORSエラーが発生しなくなります。
+  ...(process.env.NODE_ENV === 'development'
+    ? {
+        async rewrites() {
+          return [
+            {
+              source: '/api/:path*',
+              // ★★★ 修正: localhostからのリクエストのみプロキシするよう限定 ★★★
+              has: [
+                {
+                  type: 'host',
+                  value: 'localhost',
+                },
+              ],
+              destination: 'https://laube777.com/:path*',
+            },
+          ];
+        },
+      }
+    : {}),
 };
 
 module.exports = nextConfig;
